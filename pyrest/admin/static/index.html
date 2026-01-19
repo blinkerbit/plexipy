@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyRest Admin Dashboard</title>
+    <style>
+        /* Inline critical styles for faster load */
+        body { margin: 0; background: #0a0e17; color: #f0f4f8; font-family: Consolas, Monaco, monospace; }
+        .loading { display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .loading-text { font-size: 1.5rem; color: #3b82f6; }
+    </style>
+    <link rel="stylesheet" href="/pyrest/admin/static/styles.css">
+</head>
+<body>
+    <div id="app-root">
+        <div class="loading">
+            <span class="loading-text">Loading PyRest Admin...</span>
+        </div>
+    </div>
+    
+    <script>
+    // Inline the entire application to avoid external dependencies
+    (function() {
+        'use strict';
+        
+        // =====================================================================
+        // Configuration
+        // =====================================================================
+        const API_BASE = '/pyrest/admin/api';
+        const REFRESH_INTERVAL = 30000; // 30 seconds
+        
+        // =====================================================================
+        // State
+        // =====================================================================
+        let state = {
+            currentSection: 'dashboard',
+            status: null,
+            config: null,
+            apps: [],
+            isLoading: false
+        };
+        
+        // =====================================================================
+        // Utility Functions
+        // =====================================================================
+        function $(selector) {
+            return document.querySelector(selector);
+        }
+        
+        function $$(selector) {
+            return document.querySelectorAll(selector);
+        }
+        
+        function createElement(tag, attrs, children) {
+            const el = document.createElement(tag);
+            if (attrs) {
+                Object.keys(attrs).forEach(key => {
+                    if (key === 'className') {
+                        el.className = attrs[key];
+                    } else if (key === 'innerHTML') {
+                        el.innerHTML = attrs[key];
+                    } else if (key.startsWith('on')) {
+                        el.addEventListener(key.slice(2).toLowerCase(), attrs[key]);
+                    } else {
+                        el.setAttribute(key, attrs[key]);
+                    }
+                });
+            }
+            if (children) {
+                if (typeof children === 'string') {
+                    el.textContent = children;
+                } else if (Array.isArray(children)) {
+                    children.forEach(child => {
+                        if (child) el.appendChild(child);
+                    });
+                } else {
+                    el.appendChild(children);
+                }
+            }
+            return el;
+        }
+        
+        async function apiCall(endpoint, options = {}) {
+            const url = API_BASE + endpoint;
+            const token = localStorage.getItem('pyrest_token') || '';
+            
+            const config = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                },
+                ...options
+            };
+            
+            if (options.body && typeof options.body === 'object') {
+                config.body = JSON.stringify(options.body);
+            }
+            
+            const response = await fetch(url, config);
+            return response.json();
+        }
+        
+        // =====================================================================
+        // Toast Notifications
+        // =====================================================================
+        function showToast(message, type = 'info') {
+            const container = $('#toast-container');
+            if (!container) return;
+            
+            const icons = { success: '[OK]', error: '[ERR]', warning: '[!]', info: '[i]' };
+            
+            const toast = createElement('div', { className: 'toast ' + type }, [
+                createElement('span', {}, icons[type] || icons.info),
+                createElement('span', {}, message)
+            ]);
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+        
+        // =====================================================================
+        // Render Functions
+        // =====================================================================
+        function renderApp() {
+            const root = $('#app-root');
+            root.innerHTML = '';
+            
+            const container = createElement('div', { className: 'app-container' }, [
+                renderSidebar(),
+                renderMain()
+            ]);
+            
+            const toastContainer = createElement('div', { id: 'toast-container', className: 'toast-container' });
+            
+            root.appendChild(container);
+            root.appendChild(toastContainer);
+            
+            // Initial data load
+            refreshData();
+            
+            // Auto-refresh
+            setInterval(refreshData, REFRESH_INTERVAL);
+        }
+        
+        function renderSidebar() {
+            const navItems = [
+                { id: 'dashboard', icon: '[#]', label: 'Dashboard' },
+                { id: 'apps', icon: '[A]', label: 'Applications' },
+                { id: 'settings', icon: '[S]', label: 'Settings' },
+                { id: 'auth', icon: '[K]', label: 'Authentication' }
+            ];
+            
+            return createElement('aside', { className: 'sidebar' }, [
+                createElement('div', { className: 'sidebar-header' }, [
+                    createElement('div', { className: 'logo' }, [
+                        createElement('span', { className: 'logo-icon' }, '>_'),
+                        createElement('span', { className: 'logo-text' }, 'PyRest')
+                    ]),
+                    createElement('span', { className: 'version' }, 'v1.0.0')
+                ]),
+                createElement('nav', { className: 'nav-menu' }, 
+                    navItems.map(item => 
+                        createElement('a', {
+                            href: '#',
+                            className: 'nav-item' + (state.currentSection === item.id ? ' active' : ''),
+                            'data-section': item.id,
+                            onClick: (e) => {
+                                e.preventDefault();
+                                switchSection(item.id);
+                            }
+                        }, [
+                            createElement('span', { className: 'nav-icon' }, item.icon),
+                            createElement('span', {}, item.label)
+                        ])
+                    )
+                ),
+                createElement('div', { className: 'sidebar-footer' }, [
+                    createElement('a', {
+                        href: '/pyrest/',
+                        target: '_blank',
+                        className: 'nav-item'
+                    }, [
+                        createElement('span', { className: 'nav-icon' }, '[>]'),
+                        createElement('span', {}, 'API Docs')
+                    ])
+                ])
+            ]);
+        }
+        
+        function renderMain() {
+            return createElement('main', { className: 'main-content' }, [
+                renderHeader(),
+                createElement('div', { className: 'content' }, [
+                    renderDashboard(),
+                    renderApps(),
+                    renderSettings(),
+                    renderAuth()
+                ])
+            ]);
+        }
+        
+        function renderHeader() {
+            return createElement('header', { className: 'header' }, [
+                createElement('h1', { id: 'page-title' }, getTitleForSection(state.currentSection)),
+                createElement('div', { className: 'header-actions' }, [
+                    createElement('button', {
+                        className: 'btn btn-secondary',
+                        onClick: refreshData
+                    }, '[ Refresh ]'),
+                    createElement('span', { id: 'server-status', className: 'status-badge' }, [
+                        createElement('span', { className: 'status-dot' }),
+                        createElement('span', {}, 'Checking...')
+                    ])
+                ])
+            ]);
+        }
+        
+        function getTitleForSection(section) {
+            const titles = {
+                dashboard: 'Dashboard',
+                apps: 'Applications',
+                settings: 'Settings',
+                auth: 'Authentication'
+            };
+            return titles[section] || 'Dashboard';
+        }
+        
+        function renderDashboard() {
+            const s = state.status;
+            const embedded = s ? s.apps.embedded.length : 0;
+            const isolated = s ? s.apps.isolated.length : 0;
+            const running = s ? s.apps.isolated.filter(a => a.process && a.process.running).length : 0;
+            
+            return createElement('section', {
+                id: 'section-dashboard',
+                className: 'section' + (state.currentSection === 'dashboard' ? ' active' : '')
+            }, [
+                createElement('div', { className: 'stats-grid' }, [
+                    renderStatCard('[+]', embedded + isolated, 'Total Apps'),
+                    renderStatCard('[E]', embedded, 'Embedded'),
+                    renderStatCard('[I]', isolated, 'Isolated'),
+                    renderStatCard('[R]', running, 'Running')
+                ]),
+                renderSystemInfoCard(),
+                renderQuickLinksCard()
+            ]);
+        }
+        
+        function renderStatCard(icon, value, label) {
+            return createElement('div', { className: 'stat-card' }, [
+                createElement('div', { className: 'stat-icon' }, icon),
+                createElement('div', { className: 'stat-info' }, [
+                    createElement('span', { className: 'stat-value' }, String(value)),
+                    createElement('span', { className: 'stat-label' }, label)
+                ])
+            ]);
+        }
+        
+        function renderSystemInfoCard() {
+            const s = state.status;
+            const fw = s ? s.framework : {};
+            
+            return createElement('div', { className: 'card' }, [
+                createElement('div', { className: 'card-header' }, [
+                    createElement('h2', {}, 'System Information')
+                ]),
+                createElement('div', { className: 'card-body' }, [
+                    createElement('div', { className: 'info-grid' }, [
+                        renderInfoItem('Host', fw.host || '-'),
+                        renderInfoItem('Port', fw.port || '-'),
+                        renderInfoItem('Base Path', fw.base_path || '-'),
+                        renderInfoItem('Debug Mode', fw.debug ? 'Enabled' : 'Disabled')
+                    ])
+                ])
+            ]);
+        }
+        
+        function renderInfoItem(label, value) {
+            return createElement('div', { className: 'info-item' }, [
+                createElement('span', { className: 'info-label' }, label),
+                createElement('span', { className: 'info-value' }, String(value))
+            ]);
+        }
+        
+        function renderQuickLinksCard() {
+            const links = [
+                { href: '/pyrest/health', icon: '[H]', label: 'Health Check' },
+                { href: '/pyrest/apps', icon: '[A]', label: 'Apps API' },
+                { href: '/pyrest/status', icon: '[S]', label: 'Status API' },
+                { href: '/pyrest/auth/azure/login', icon: '[L]', label: 'Azure Login' }
+            ];
+            
+            return createElement('div', { className: 'card' }, [
+                createElement('div', { className: 'card-header' }, [
+                    createElement('h2', {}, 'Quick Links')
+                ]),
+                createElement('div', { className: 'card-body' }, [
+                    createElement('div', { className: 'quick-links' },
+                        links.map(link =>
+                            createElement('a', {
+                                href: link.href,
+                                target: '_blank',
+                                className: 'quick-link'
+                            }, [
+                                createElement('span', {}, link.icon),
+                                createElement('span', {}, link.label)
+                            ])
+                        )
+                    )
+                ])
+            ]);
+        }
+        
+        function renderApps() {
+            const embedded = state.apps.filter(a => a.type === 'embedded');
+            const isolated = state.apps.filter(a => a.type === 'isolated');
+            
+            return createElement('section', {
+                id: 'section-apps',
+                className: 'section' + (state.currentSection === 'apps' ? ' active' : '')
+            }, [
+                renderAppsCard('Embedded Apps', embedded, false),
+                renderAppsCard('Isolated Apps', isolated, true)
+            ]);
+        }
+        
+        function renderAppsCard(title, apps, showControls) {
+            return createElement('div', { className: 'card' }, [
+                createElement('div', { className: 'card-header' }, [
+                    createElement('h2', {}, title),
+                    createElement('span', { className: 'badge' }, String(apps.length))
+                ]),
+                createElement('div', { className: 'card-body' }, [
+                    apps.length === 0
+                        ? createElement('p', { className: 'empty-state' }, 'No apps found')
+                        : createElement('div', { className: 'apps-list' },
+                            apps.map(app => renderAppCard(app, showControls))
+                        )
+                ])
+            ]);
+        }
+        
+        function renderAppCard(app, showControls) {
+            const isRunning = app.running;
+            
+            const actions = [];
+            actions.push(createElement('span', {
+                className: 'badge ' + (showControls ? (isRunning ? 'success' : 'warning') : 'success')
+            }, showControls ? (isRunning ? 'Running' : 'Stopped') : 'Running'));
+            
+            if (showControls) {
+                if (isRunning) {
+                    actions.push(createElement('button', {
+                        className: 'btn btn-sm btn-secondary',
+                        onClick: () => controlApp(app.name, 'restart')
+                    }, '[R]'));
+                    actions.push(createElement('button', {
+                        className: 'btn btn-sm btn-danger',
+                        onClick: () => controlApp(app.name, 'stop')
+                    }, '[X]'));
+                } else {
+                    actions.push(createElement('button', {
+                        className: 'btn btn-sm btn-success',
+                        onClick: () => controlApp(app.name, 'start')
+                    }, '[>]'));
+                }
+            }
+            
+            return createElement('div', { className: 'app-card' }, [
+                createElement('div', { className: 'app-info' }, [
+                    createElement('div', { className: 'app-name' }, [
+                        createElement('span', {}, showControls ? '[I]' : '[E]'),
+                        document.createTextNode(' ' + app.name + ' '),
+                        createElement('span', { className: 'badge' }, app.version),
+                        app.port ? createElement('span', { className: 'badge info' }, 'Port ' + app.port) : null
+                    ]),
+                    createElement('div', { className: 'app-meta' }, [
+                        document.createTextNode((app.description || 'No description') + ' | '),
+                        createElement('a', { href: app.prefix + '/', target: '_blank' }, app.prefix + '/')
+                    ])
+                ]),
+                createElement('div', { className: 'app-actions' }, actions)
+            ]);
+        }
+        
+        function renderSettings() {
+            const c = state.config || {};
+            
+            return createElement('section', {
+                id: 'section-settings',
+                className: 'section' + (state.currentSection === 'settings' ? ' active' : '')
+            }, [
+                createElement('div', { className: 'card' }, [
+                    createElement('div', { className: 'card-header' }, [
+                        createElement('h2', {}, 'Framework Configuration')
+                    ]),
+                    createElement('div', { className: 'card-body' }, [
+                        createElement('form', {
+                            id: 'config-form',
+                            className: 'settings-form',
+                            onSubmit: (e) => {
+                                e.preventDefault();
+                                saveConfig();
+                            }
+                        }, [
+                            renderFormGroup('Debug Mode', 'config-debug', 'select', c.debug, [
+                                { value: 'false', label: 'Disabled' },
+                                { value: 'true', label: 'Enabled' }
+                            ]),
+                            renderFormGroup('CORS Enabled', 'config-cors', 'select', c.cors_enabled, [
+                                { value: 'true', label: 'Enabled' },
+                                { value: 'false', label: 'Disabled' }
+                            ]),
+                            renderFormGroup('Log Level', 'config-log-level', 'select', c.log_level, [
+                                { value: 'DEBUG', label: 'DEBUG' },
+                                { value: 'INFO', label: 'INFO' },
+                                { value: 'WARNING', label: 'WARNING' },
+                                { value: 'ERROR', label: 'ERROR' }
+                            ]),
+                            renderFormGroup('JWT Expiry (hours)', 'config-jwt-expiry', 'number', c.jwt_expiry_hours),
+                            createElement('div', { className: 'form-actions' }, [
+                                createElement('button', { type: 'submit', className: 'btn btn-primary' }, 'Save Changes'),
+                                createElement('button', {
+                                    type: 'button',
+                                    className: 'btn btn-secondary',
+                                    onClick: loadConfig
+                                }, 'Reset')
+                            ])
+                        ])
+                    ])
+                ]),
+                createElement('div', { className: 'card' }, [
+                    createElement('div', { className: 'card-header' }, [
+                        createElement('h2', {}, 'Read-Only Settings')
+                    ]),
+                    createElement('div', { className: 'card-body' }, [
+                        createElement('div', { className: 'info-grid' }, [
+                            renderInfoItem('Host', c.host || '-'),
+                            renderInfoItem('Port', c.port || '-'),
+                            renderInfoItem('Apps Folder', c.apps_folder || '-'),
+                            renderInfoItem('Isolated Base Port', c.isolated_app_base_port || '-')
+                        ])
+                    ])
+                ])
+            ]);
+        }
+        
+        function renderFormGroup(label, id, type, value, options) {
+            let input;
+            
+            if (type === 'select') {
+                input = createElement('select', { id: id, name: id },
+                    options.map(opt =>
+                        createElement('option', {
+                            value: opt.value,
+                            ...(String(value) === opt.value ? { selected: 'selected' } : {})
+                        }, opt.label)
+                    )
+                );
+            } else {
+                input = createElement('input', {
+                    type: type,
+                    id: id,
+                    name: id,
+                    value: value || '',
+                    ...(type === 'number' ? { min: '1', max: '720' } : {})
+                });
+            }
+            
+            return createElement('div', { className: 'form-group' }, [
+                createElement('label', { for: id }, label),
+                input
+            ]);
+        }
+        
+        function renderAuth() {
+            return createElement('section', {
+                id: 'section-auth',
+                className: 'section' + (state.currentSection === 'auth' ? ' active' : '')
+            }, [
+                createElement('div', { className: 'card' }, [
+                    createElement('div', { className: 'card-header' }, [
+                        createElement('h2', {}, 'Azure AD Configuration'),
+                        createElement('span', { id: 'auth-status', className: 'badge warning' }, 'Loading...')
+                    ]),
+                    createElement('div', { id: 'auth-info', className: 'card-body' }, [
+                        createElement('p', { className: 'empty-state' }, 'Loading auth configuration...')
+                    ])
+                ])
+            ]);
+        }
+        
+        // =====================================================================
+        // Data Functions
+        // =====================================================================
+        async function refreshData() {
+            try {
+                state.isLoading = true;
+                await Promise.all([loadStatus(), loadApps()]);
+                updateServerStatus(true);
+            } catch (error) {
+                console.error('Refresh failed:', error);
+                updateServerStatus(false);
+            } finally {
+                state.isLoading = false;
+            }
+        }
+        
+        function updateServerStatus(online) {
+            const badge = $('#server-status');
+            if (!badge) return;
+            
+            badge.className = 'status-badge ' + (online ? 'online' : 'offline');
+            const text = badge.querySelector('span:last-child');
+            if (text) text.textContent = online ? 'Online' : 'Offline';
+        }
+        
+        async function loadStatus() {
+            const data = await apiCall('/status');
+            if (data.success) {
+                state.status = data.data;
+                updateDashboardStats();
+            }
+        }
+        
+        function updateDashboardStats() {
+            const s = state.status;
+            if (!s) return;
+            
+            // Update stats
+            const statValues = $$('.stat-value');
+            if (statValues.length >= 4) {
+                const embedded = s.apps.embedded.length;
+                const isolated = s.apps.isolated.length;
+                const running = s.apps.isolated.filter(a => a.process && a.process.running).length;
+                
+                statValues[0].textContent = embedded + isolated;
+                statValues[1].textContent = embedded;
+                statValues[2].textContent = isolated;
+                statValues[3].textContent = running;
+            }
+            
+            // Update system info
+            const fw = s.framework;
+            const infoValues = $$('#section-dashboard .info-value');
+            if (infoValues.length >= 4) {
+                infoValues[0].textContent = fw.host || '-';
+                infoValues[1].textContent = fw.port || '-';
+                infoValues[2].textContent = fw.base_path || '-';
+                infoValues[3].textContent = fw.debug ? 'Enabled' : 'Disabled';
+            }
+        }
+        
+        async function loadApps() {
+            const data = await apiCall('/apps');
+            if (data.success) {
+                state.apps = data.data.apps;
+                updateAppsLists();
+            }
+        }
+        
+        function updateAppsLists() {
+            // Re-render apps section
+            const appsSection = $('#section-apps');
+            if (appsSection && state.currentSection === 'apps') {
+                const embedded = state.apps.filter(a => a.type === 'embedded');
+                const isolated = state.apps.filter(a => a.type === 'isolated');
+                
+                appsSection.innerHTML = '';
+                appsSection.appendChild(renderAppsCard('Embedded Apps', embedded, false));
+                appsSection.appendChild(renderAppsCard('Isolated Apps', isolated, true));
+                appsSection.className = 'section active';
+            }
+        }
+        
+        async function loadConfig() {
+            try {
+                const data = await apiCall('/config');
+                if (data.success) {
+                    state.config = data.data;
+                    
+                    // Update form
+                    const debugEl = $('#config-debug');
+                    const corsEl = $('#config-cors');
+                    const logEl = $('#config-log-level');
+                    const jwtEl = $('#config-jwt-expiry');
+                    
+                    if (debugEl) debugEl.value = String(state.config.debug);
+                    if (corsEl) corsEl.value = String(state.config.cors_enabled);
+                    if (logEl) logEl.value = state.config.log_level || 'INFO';
+                    if (jwtEl) jwtEl.value = state.config.jwt_expiry_hours || 24;
+                }
+            } catch (error) {
+                showToast('Failed to load config', 'error');
+            }
+        }
+        
+        async function saveConfig() {
+            try {
+                const formData = {
+                    debug: $('#config-debug').value === 'true',
+                    cors_enabled: $('#config-cors').value === 'true',
+                    log_level: $('#config-log-level').value,
+                    jwt_expiry_hours: parseInt($('#config-jwt-expiry').value)
+                };
+                
+                const data = await apiCall('/config', {
+                    method: 'PUT',
+                    body: formData
+                });
+                
+                if (data.success) {
+                    showToast('Configuration saved', 'success');
+                } else {
+                    showToast(data.error || 'Failed to save', 'error');
+                }
+            } catch (error) {
+                showToast('Failed to save config', 'error');
+            }
+        }
+        
+        async function loadAuthConfig() {
+            try {
+                const data = await apiCall('/auth-config');
+                if (data.success) {
+                    const auth = data.data;
+                    
+                    const statusBadge = $('#auth-status');
+                    if (statusBadge) {
+                        statusBadge.className = 'badge ' + (auth.is_configured ? 'success' : 'warning');
+                        statusBadge.textContent = auth.is_configured ? 'Configured' : 'Not Configured';
+                    }
+                    
+                    const authInfo = $('#auth-info');
+                    if (authInfo) {
+                        authInfo.innerHTML = '';
+                        authInfo.appendChild(createElement('div', { className: 'info-grid' }, [
+                            renderInfoItem('Provider', auth.provider || '-'),
+                            renderInfoItem('Tenant ID', auth.tenant_id || '-'),
+                            renderInfoItem('Client ID', auth.client_id || '-'),
+                            renderInfoItem('Redirect URI', auth.redirect_uri || '-'),
+                            createElement('div', { className: 'info-item full-width' }, [
+                                createElement('span', { className: 'info-label' }, 'Scopes'),
+                                createElement('span', { className: 'info-value' },
+                                    Array.isArray(auth.scopes) ? auth.scopes.join(', ') : String(auth.scopes)
+                                )
+                            ])
+                        ]));
+                        authInfo.appendChild(createElement('p', { className: 'help-text' }, [
+                            document.createTextNode('To configure Azure AD, edit the '),
+                            createElement('code', {}, 'auth_config.json'),
+                            document.createTextNode(' file.')
+                        ]));
+                    }
+                }
+            } catch (error) {
+                showToast('Failed to load auth config', 'error');
+            }
+        }
+        
+        async function controlApp(appName, action) {
+            try {
+                const data = await apiCall('/apps/' + appName + '/' + action, {
+                    method: 'POST'
+                });
+                
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    setTimeout(refreshData, 1000);
+                } else {
+                    showToast(data.error || 'Action failed', 'error');
+                }
+            } catch (error) {
+                showToast('Failed to control app', 'error');
+            }
+        }
+        
+        // =====================================================================
+        // Navigation
+        // =====================================================================
+        function switchSection(section) {
+            state.currentSection = section;
+            
+            // Update nav
+            $$('.nav-item[data-section]').forEach(item => {
+                item.classList.toggle('active', item.getAttribute('data-section') === section);
+            });
+            
+            // Update sections
+            $$('.section').forEach(sec => {
+                sec.classList.toggle('active', sec.id === 'section-' + section);
+            });
+            
+            // Update title
+            const title = $('#page-title');
+            if (title) title.textContent = getTitleForSection(section);
+            
+            // Load section data
+            if (section === 'settings') {
+                loadConfig();
+            } else if (section === 'auth') {
+                loadAuthConfig();
+            } else if (section === 'apps') {
+                updateAppsLists();
+            }
+        }
+        
+        // =====================================================================
+        // Initialize
+        // =====================================================================
+        document.addEventListener('DOMContentLoaded', renderApp);
+    })();
+    </script>
+</body>
+</html>

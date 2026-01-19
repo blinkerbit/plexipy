@@ -1,0 +1,41 @@
+# PyRest Development Docker Compose
+# 
+# Usage:
+#   docker-compose -f docker-compose.dev.yml up -d
+#   docker-compose -f docker-compose.dev.yml logs -f
+#
+# Features:
+#   - Hot reload with volume mounts
+#   - Debug mode enabled
+#   - No nginx (direct access to PyRest)
+
+version: '3.8'
+
+services:
+  pyrest-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pyrest-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYREST_HOST=0.0.0.0
+      - PYREST_PORT=8000
+      - PYREST_DEBUG=true
+    volumes:
+      # Mount source code for hot reload
+      - ./pyrest:/app/pyrest:ro
+      - ./apps:/app/apps:ro
+      - ./main.py:/app/main.py:ro
+      - ./config.json:/app/config.json:ro
+      - ./auth_config.json:/app/auth_config.json:ro
+      - ./nginx:/app/nginx
+    command: ["python", "main.py", "--debug", "--no-isolated"]
+    networks:
+      - pyrest-dev-network
+
+networks:
+  pyrest-dev-network:
+    driver: bridge

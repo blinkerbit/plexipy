@@ -1,0 +1,11 @@
+{
+  "provider": "azure_ad",
+  "tenant_id": "your-tenant-id-here",
+  "client_id": "your-client-id-here",
+  "client_secret": "your-client-secret-here",
+  "redirect_uri": "http://localhost:8000/pyrest/auth/azure/callback",
+  "scopes": ["openid", "profile", "email", "User.Read"],
+  "jwt_secret": "change-this-secret-in-production-use-a-long-random-string",
+  "jwt_expiry_hours": 24,
+  "jwt_algorithm": "HS256"
+}

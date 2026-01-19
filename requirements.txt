@@ -1,0 +1,18 @@
+# PyRest Framework Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web Framework
+tornado>=6.4
+
+# JWT Authentication
+PyJWT>=2.8.0
+
+# Note: TM1py is NOT required for the main framework.
+# It is only needed for apps that use TM1 functionality.
+# Apps with their own requirements.txt will have TM1py installed
+# in their isolated virtual environments.
+
+# Development/Testing dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0

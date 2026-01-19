@@ -1,0 +1,180 @@
+"""
+Pytest configuration and shared fixtures for PyRest tests.
+"""
+
+import os
+import sys
+import json
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Generator, Dict, Any
+
+import pytest
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+@pytest.fixture
+def temp_dir() -> Generator[Path, None, None]:
+    """Create a temporary directory for tests."""
+    temp_path = Path(tempfile.mkdtemp())
+    yield temp_path
+    shutil.rmtree(temp_path, ignore_errors=True)
+
+
+@pytest.fixture
+def sample_config() -> Dict[str, Any]:
+    """Sample framework configuration."""
+    return {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "debug": True,
+        "base_path": "/pyrest",
+        "apps_folder": "apps",
+        "env_file": ".env",
+        "auth_config_file": "auth_config.json",
+        "jwt_secret": "test-secret-key-for-testing",
+        "jwt_expiry_hours": 24,
+        "cors_enabled": True,
+        "cors_origins": ["*"],
+        "isolated_app_base_port": 8001
+    }
+
+
+@pytest.fixture
+def sample_auth_config() -> Dict[str, Any]:
+    """Sample auth configuration."""
+    return {
+        "provider": "azure_ad",
+        "tenant_id": "test-tenant-id",
+        "client_id": "test-client-id",
+        "client_secret": "test-client-secret",
+        "redirect_uri": "http://localhost:8000/pyrest/auth/azure/callback",
+        "scopes": ["openid", "profile", "email"],
+        "jwt_secret": "test-jwt-secret",
+        "jwt_expiry_hours": 24,
+        "jwt_algorithm": "HS256"
+    }
+
+
+@pytest.fixture
+def sample_app_config() -> Dict[str, Any]:
+    """Sample app configuration."""
+    return {
+        "name": "testapp",
+        "version": "1.0.0",
+        "description": "Test application",
+        "enabled": True,
+        "auth_required": False,
+        "settings": {
+            "custom_setting": "value"
+        }
+    }
+
+
+@pytest.fixture
+def temp_config_file(temp_dir: Path, sample_config: Dict[str, Any]) -> Path:
+    """Create a temporary config.json file."""
+    config_path = temp_dir / "config.json"
+    with open(config_path, "w") as f:
+        json.dump(sample_config, f)
+    return config_path
+
+
+@pytest.fixture
+def temp_auth_config_file(temp_dir: Path, sample_auth_config: Dict[str, Any]) -> Path:
+    """Create a temporary auth_config.json file."""
+    config_path = temp_dir / "auth_config.json"
+    with open(config_path, "w") as f:
+        json.dump(sample_auth_config, f)
+    return config_path
+
+
+@pytest.fixture
+def temp_app_dir(temp_dir: Path, sample_app_config: Dict[str, Any]) -> Path:
+    """Create a temporary app directory with config and handlers."""
+    apps_dir = temp_dir / "apps"
+    app_dir = apps_dir / "testapp"
+    app_dir.mkdir(parents=True)
+    
+    # Create config.json
+    with open(app_dir / "config.json", "w") as f:
+        json.dump(sample_app_config, f)
+    
+    # Create handlers.py
+    handlers_content = '''
+from pyrest.handlers import BaseHandler
+
+class TestHandler(BaseHandler):
+    async def get(self):
+        self.success(data={"message": "Test handler"})
+
+def get_handlers():
+    return [
+        (r"/", TestHandler),
+    ]
+'''
+    with open(app_dir / "handlers.py", "w") as f:
+        f.write(handlers_content)
+    
+    return app_dir
+
+
+@pytest.fixture
+def temp_isolated_app_dir(temp_dir: Path) -> Path:
+    """Create a temporary isolated app directory with requirements.txt."""
+    apps_dir = temp_dir / "apps"
+    app_dir = apps_dir / "isolatedapp"
+    app_dir.mkdir(parents=True)
+    
+    # Create config.json
+    config = {
+        "name": "isolatedapp",
+        "version": "1.0.0",
+        "description": "Isolated test application",
+        "enabled": True,
+        "port": 8002
+    }
+    with open(app_dir / "config.json", "w") as f:
+        json.dump(config, f)
+    
+    # Create requirements.txt (triggers isolated mode)
+    with open(app_dir / "requirements.txt", "w") as f:
+        f.write("tornado>=6.4\n")
+    
+    # Create handlers.py
+    handlers_content = '''
+from pyrest.handlers import BaseHandler
+
+class IsolatedHandler(BaseHandler):
+    async def get(self):
+        self.success(data={"message": "Isolated handler"})
+
+def get_handlers():
+    return [
+        (r"/", IsolatedHandler),
+    ]
+'''
+    with open(app_dir / "handlers.py", "w") as f:
+        f.write(handlers_content)
+    
+    return app_dir
+
+
+@pytest.fixture
+def mock_env_vars():
+    """Set up mock environment variables for testing."""
+    original_env = os.environ.copy()
+    
+    os.environ["AZURE_AD_TENANT_ID"] = "test-tenant"
+    os.environ["AZURE_AD_CLIENT_ID"] = "test-client"
+    os.environ["AZURE_AD_CLIENT_SECRET"] = "test-secret"
+    os.environ["JWT_SECRET"] = "test-jwt-secret"
+    
+    yield
+    
+    # Restore original environment
+    os.environ.clear()
+    os.environ.update(original_env)

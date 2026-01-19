@@ -1,0 +1,6 @@
+# TM1 Data API Dependencies
+# This file triggers isolated app mode - the app will run in its own venv
+
+tornado>=6.4
+PyJWT>=2.8.0
+TM1py>=2.0.0

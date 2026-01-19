@@ -1,0 +1,11 @@
+{
+  "name": "hello",
+  "version": "1.0.0",
+  "description": "A simple hello world embedded app (no requirements.txt)",
+  "enabled": true,
+  "auth_required": false,
+  "settings": {
+    "greeting": "Hello",
+    "max_name_length": 100
+  }
+}

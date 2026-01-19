@@ -1,0 +1,59 @@
+# Dockerfile for Isolated PyRest Apps
+# Use this as a base for apps that need their own dependencies
+
+ARG PYTHON_VERSION=3.11
+
+FROM python:${PYTHON_VERSION}-slim
+
+# Labels
+LABEL maintainer="PyRest Team"
+LABEL description="PyRest Isolated App Container"
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1
+
+# Build arguments for app configuration
+ARG APP_NAME=myapp
+ARG APP_PORT=8001
+
+ENV PYREST_APP_NAME=${APP_NAME} \
+    PYREST_APP_PORT=${APP_PORT} \
+    PYREST_APP_PATH=/app \
+    PYREST_BASE_PATH=/pyrest
+
+# Create non-root user
+RUN groupadd --gid 1000 pyrest && \
+    useradd --uid 1000 --gid pyrest --shell /bin/bash --create-home pyrest
+
+WORKDIR /app
+
+# Install base dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir tornado>=6.4 PyJWT>=2.8.0
+
+# Copy framework templates (needed for isolated app runner)
+COPY --chown=pyrest:pyrest pyrest/templates/ ./pyrest/templates/
+COPY --chown=pyrest:pyrest pyrest/handlers.py ./pyrest/
+COPY --chown=pyrest:pyrest pyrest/__init__.py ./pyrest/
+
+# Copy app files (override in docker-compose or build args)
+# These will be mounted or copied when building specific app images
+COPY --chown=pyrest:pyrest apps/${APP_NAME}/ ./
+
+# Install app-specific requirements if present
+RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+
+# Switch to non-root user
+USER pyrest
+
+# Expose app port
+EXPOSE ${APP_PORT}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PYREST_APP_PORT}/pyrest/${PYREST_APP_NAME}/health')" || exit 1
+
+# Run the isolated app
+CMD ["python", "pyrest/templates/isolated_app.py"]

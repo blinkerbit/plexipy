@@ -1,0 +1,14 @@
+{
+  "name": "tm1data",
+  "version": "1.0.0",
+  "description": "TM1 Data API - An ISOLATED app with tm1py dependency",
+  "enabled": true,
+  "auth_required": true,
+  "port": 8001,
+  "venv_path": ".venv",
+  "settings": {
+    "tm1_server": "localhost",
+    "tm1_port": 8010,
+    "tm1_ssl": true
+  }
+}

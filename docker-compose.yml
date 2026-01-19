@@ -1,0 +1,128 @@
+# PyRest Framework Docker Compose Configuration
+# 
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose up -d --build      # Rebuild and start
+#   docker-compose logs -f pyrest     # View logs
+#   docker-compose down               # Stop all services
+
+version: '3.8'
+
+services:
+  # =========================================================================
+  # Main PyRest Server
+  # =========================================================================
+  pyrest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pyrest-main
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYREST_HOST=0.0.0.0
+      - PYREST_PORT=8000
+      - PYREST_DEBUG=false
+    volumes:
+      # Mount apps folder for development (comment out in production)
+      - ./apps:/app/apps:ro
+      # Mount config files
+      - ./config.json:/app/config.json:ro
+      - ./auth_config.json:/app/auth_config.json:ro
+      # Nginx config output
+      - ./nginx:/app/nginx
+      # Logs
+      - pyrest-logs:/app/logs
+    networks:
+      - pyrest-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/pyrest/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # =========================================================================
+  # Example Isolated App: TM1 Data API
+  # Uncomment to run as separate container
+  # =========================================================================
+  # tm1data:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.isolated
+  #     args:
+  #       APP_NAME: tm1data
+  #       APP_PORT: 8001
+  #   container_name: pyrest-tm1data
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8001:8001"
+  #   environment:
+  #     - PYREST_APP_NAME=tm1data
+  #     - PYREST_APP_PORT=8001
+  #     - PYREST_BASE_PATH=/pyrest
+  #     - PYREST_AUTH_CONFIG=/app/auth_config.json
+  #   volumes:
+  #     - ./auth_config.json:/app/auth_config.json:ro
+  #   networks:
+  #     - pyrest-network
+  #   depends_on:
+  #     - pyrest
+
+  # =========================================================================
+  # Nginx Reverse Proxy
+  # =========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: pyrest-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/docker-nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/pyrest_generated.conf:/etc/nginx/conf.d/pyrest.conf:ro
+      # SSL certificates (uncomment for HTTPS)
+      # - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - pyrest-network
+    depends_on:
+      - pyrest
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================================================================
+  # Redis (Optional - for session storage / caching)
+  # =========================================================================
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: pyrest-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - pyrest-network
+  #   command: redis-server --appendonly yes
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  pyrest-network:
+    driver: bridge
+    name: pyrest-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  pyrest-logs:
+    name: pyrest-logs
+  # redis-data:
+  #   name: pyrest-redis-data

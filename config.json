@@ -1,0 +1,17 @@
+{
+  "host": "0.0.0.0",
+  "port": 8000,
+  "debug": true,
+  "base_path": "/pyrest",
+  "apps_folder": "apps",
+  "env_file": ".env",
+  "auth_config_file": "auth_config.json",
+  "jwt_secret": "change-this-secret-in-production-use-a-long-random-string",
+  "jwt_expiry_hours": 24,
+  "cors_enabled": true,
+  "cors_origins": ["*"],
+  "log_level": "INFO",
+  "static_path": "static",
+  "template_path": "templates",
+  "isolated_app_base_port": 8001
+}
