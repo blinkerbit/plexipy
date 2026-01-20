@@ -407,7 +407,9 @@ class AdminStaticHandler(tornado.web.StaticFileHandler):
 
 
 def get_admin_handlers(app_loader=None, process_manager=None) -> list:
-    """Get all admin handlers."""
+    """Get all admin handlers.
+    All routes use /? pattern for optional trailing slash support.
+    """
     init_kwargs = {
         "app_loader": app_loader,
         "process_manager": process_manager
@@ -418,18 +420,17 @@ def get_admin_handlers(app_loader=None, process_manager=None) -> list:
     
     handlers = [
         # Dashboard UI
-        (rf"{ADMIN_PATH}", AdminDashboardHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/", AdminDashboardHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/?", AdminDashboardHandler, init_kwargs),
         
         # API endpoints
-        (rf"{ADMIN_PATH}/api/status", AdminAPIStatusHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/api/config", AdminAPIConfigHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/api/auth-config", AdminAPIAuthConfigHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/api/apps", AdminAPIAppsHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)", AdminAPIAppDetailHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)/(?P<action>start|stop|restart)", 
+        (rf"{ADMIN_PATH}/api/status/?", AdminAPIStatusHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/api/config/?", AdminAPIConfigHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/api/auth-config/?", AdminAPIAuthConfigHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/api/apps/?", AdminAPIAppsHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)/?", AdminAPIAppDetailHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)/(?P<action>start|stop|restart)/?", 
          AdminAPIAppControlHandler, init_kwargs),
-        (rf"{ADMIN_PATH}/api/logs", AdminAPILogsHandler, init_kwargs),
+        (rf"{ADMIN_PATH}/api/logs/?", AdminAPILogsHandler, init_kwargs),
         
         # Static files
         (rf"{ADMIN_PATH}/static/(.*)", AdminStaticHandler, {"path": str(static_path)}),

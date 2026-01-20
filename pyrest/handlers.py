@@ -271,14 +271,16 @@ BASE_PATH = "/pyrest"
 
 
 def get_auth_handlers():
-    """Get all authentication-related handlers with /pyrest prefix."""
+    """Get all authentication-related handlers with /pyrest prefix.
+    All routes use /? pattern for optional trailing slash support.
+    """
     return [
-        (rf"{BASE_PATH}/auth/login", AuthLoginHandler),
-        (rf"{BASE_PATH}/auth/register", AuthRegisterHandler),
-        (rf"{BASE_PATH}/auth/refresh", AuthRefreshHandler),
-        (rf"{BASE_PATH}/auth/me", AuthMeHandler),
-        (rf"{BASE_PATH}/auth/azure/login", AzureADLoginHandler),
-        (rf"{BASE_PATH}/auth/azure/callback", AzureADCallbackHandler),
-        (rf"{BASE_PATH}/auth/azure/logout", AzureADLogoutHandler),
-        (rf"{BASE_PATH}/health", HealthHandler),
+        (rf"{BASE_PATH}/auth/login/?", AuthLoginHandler),
+        (rf"{BASE_PATH}/auth/register/?", AuthRegisterHandler),
+        (rf"{BASE_PATH}/auth/refresh/?", AuthRefreshHandler),
+        (rf"{BASE_PATH}/auth/me/?", AuthMeHandler),
+        (rf"{BASE_PATH}/auth/azure/login/?", AzureADLoginHandler),
+        (rf"{BASE_PATH}/auth/azure/callback/?", AzureADCallbackHandler),
+        (rf"{BASE_PATH}/auth/azure/logout/?", AzureADLogoutHandler),
+        (rf"{BASE_PATH}/health/?", HealthHandler),
     ]

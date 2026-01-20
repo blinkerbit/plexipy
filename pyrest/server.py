@@ -37,7 +37,7 @@ class IndexHandler(BaseHandler):
         self.app_loader = app_loader
     
     async def get(self):
-        """Render landing page."""
+        """Render landing page or return JSON if template unavailable."""
         embedded_apps = []
         isolated_apps = []
         failed_apps = []
@@ -45,18 +45,35 @@ class IndexHandler(BaseHandler):
         if self.app_loader:
             embedded_apps = self.app_loader.get_embedded_apps()
             isolated_apps = self.app_loader.get_isolated_apps()
-            # Convert failed apps dicts to objects for consistent template access
+            failed_apps = self.app_loader.get_failed_apps()
+        
+        # Try to render template, fall back to JSON
+        try:
             from types import SimpleNamespace
-            for app in self.app_loader.get_failed_apps():
-                failed_apps.append(SimpleNamespace(**app))
-            
-        self.render("landing.html", 
-            version="1.0.0",
-            base_path=BASE_PATH,
-            embedded_apps=embedded_apps,
-            isolated_apps=isolated_apps,
-            failed_apps=failed_apps
-        )
+            failed_objs = [SimpleNamespace(**app) for app in failed_apps]
+            self.render("landing.html", 
+                version="1.0.0",
+                base_path=BASE_PATH,
+                embedded_apps=embedded_apps,
+                isolated_apps=isolated_apps,
+                failed_apps=failed_objs
+            )
+        except Exception as e:
+            logger.warning(f"Template rendering failed, returning JSON: {e}")
+            self.success(data={
+                "name": "PyRest API Framework",
+                "version": "1.0.0",
+                "base_path": BASE_PATH,
+                "embedded_apps": [{"name": a.name, "prefix": a.prefix} for a in embedded_apps],
+                "isolated_apps": [{"name": a.name, "prefix": a.prefix, "port": a.port} for a in isolated_apps],
+                "failed_apps": failed_apps,
+                "endpoints": {
+                    "health": f"{BASE_PATH}/health",
+                    "apps": f"{BASE_PATH}/apps",
+                    "status": f"{BASE_PATH}/status",
+                    "admin": f"{BASE_PATH}/admin"
+                }
+            })
 
 
 class StatusHandler(BaseHandler):
@@ -143,11 +160,11 @@ class PyRestApplication(tornado.web.Application):
         app_handlers = self.app_loader.load_all_apps()
         
         # Combine all handlers with /pyrest base path
+        # Use /? pattern for optional trailing slash support
         handlers = [
-            (rf"{BASE_PATH}", IndexHandler, {"app_loader": self.app_loader}),
-            (rf"{BASE_PATH}/", IndexHandler, {"app_loader": self.app_loader}),
-            (rf"{BASE_PATH}/apps", AppsInfoHandler, {"app_loader": self.app_loader}),
-            (rf"{BASE_PATH}/status", StatusHandler, {
+            (rf"{BASE_PATH}/?", IndexHandler, {"app_loader": self.app_loader}),
+            (rf"{BASE_PATH}/apps/?", AppsInfoHandler, {"app_loader": self.app_loader}),
+            (rf"{BASE_PATH}/status/?", StatusHandler, {
                 "app_loader": self.app_loader,
                 "process_manager": self.process_manager
             }),
@@ -188,8 +205,12 @@ class PyRestApplication(tornado.web.Application):
         
         if template_path and os.path.exists(template_path):
             app_settings["template_path"] = template_path
+            logger.info(f"Using config template path: {template_path}")
         elif os.path.exists(default_template_path):
             app_settings["template_path"] = default_template_path
+            logger.info(f"Using default template path: {default_template_path}")
+        else:
+            logger.warning(f"No template path found (checked: {default_template_path})")
         
         super().__init__(handlers, **app_settings)
         

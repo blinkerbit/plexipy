@@ -285,7 +285,9 @@ class AppLoader:
                     path = "/" + path
                 
                 # Create the full path with BASE_PATH and app prefix
-                full_path = f"{BASE_PATH}{prefix}{path}"
+                # Use regex pattern with optional trailing slash for flexible matching
+                base_path = f"{BASE_PATH}{prefix}{path}".rstrip("/")
+                full_path = rf"{base_path}/?"
                 
                 # Handle additional init kwargs
                 if len(handler_tuple) >= 3:
