@@ -92,6 +92,23 @@ python main.py
 
 The server starts at `http://localhost:8000/pyrest`
 
+### Pip Proxy Configuration
+
+To configure pip proxy settings (e.g., for corporate networks), edit `setup_pip.sh` in the project root. This script is run automatically before any venv or pip operations.
+
+Example `setup_pip.sh`:
+
+```bash
+#!/bin/bash
+# Uncomment and modify as needed:
+# export PIP_INDEX_URL="https://your-proxy.com/simple"
+# export PIP_TRUSTED_HOST="your-proxy.com"
+# export HTTP_PROXY="http://proxy.example.com:8080"
+# export HTTPS_PROXY="http://proxy.example.com:8080"
+```
+
+The file is empty by default; add your proxy or pip configuration as needed. On Unix, ensure it is executable: `chmod +x setup_pip.sh`.
+
 ---
 
 ## Configuration
@@ -734,6 +751,8 @@ The framework will:
 ---
 
 ## Docker Deployment
+
+The image includes `setup_pip.sh`; it is run before venv and pip operations. Edit it before building if you need pip proxy configuration.
 
 ### Quick Start
 

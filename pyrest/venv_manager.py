@@ -22,6 +22,56 @@ class VenvManager:
     
     def __init__(self):
         self.is_windows = platform.system() == "Windows"
+        self._setup_pip_script = Path(__file__).parent.parent / "setup_pip.sh"
+    
+    def _run_setup_pip_script(self) -> None:
+        """Run setup_pip.sh script if it exists to configure pip proxy etc."""
+        if not self._setup_pip_script.exists():
+            return
+        try:
+            if self.is_windows:
+                try:
+                    with open(self._setup_pip_script, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line or line.startswith("#"):
+                                continue
+                            if line.startswith("export "):
+                                line = line[7:].strip()
+                            if "=" in line:
+                                key, value = line.split("=", 1)
+                                value = value.strip().strip('"').strip("'")
+                                os.environ[key.strip()] = value
+                except Exception as e:
+                    logger.warning(f"Failed to parse setup_pip.sh on Windows: {e}")
+            else:
+                if os.access(self._setup_pip_script, os.X_OK):
+                    result = subprocess.run(
+                        ["bash", "-c", f"source {self._setup_pip_script} && env"],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    if result.returncode == 0:
+                        for line in result.stdout.splitlines():
+                            if "=" in line and not line.startswith("#"):
+                                key, value = line.split("=", 1)
+                                os.environ[key] = value
+                else:
+                    try:
+                        with open(self._setup_pip_script, "r") as f:
+                            for line in f:
+                                line = line.strip()
+                                if not line or line.startswith("#"):
+                                    continue
+                                if line.startswith("export "):
+                                    line = line[7:].strip()
+                                if "=" in line:
+                                    key, value = line.split("=", 1)
+                                    value = value.strip().strip('"').strip("'")
+                                    os.environ[key.strip()] = value
+                    except Exception as e:
+                        logger.warning(f"Failed to parse setup_pip.sh: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to run setup_pip.sh: {e}")
     
     def get_venv_path(self, app_path: Path, venv_name: str = ".venv") -> Path:
         """Get the virtual environment path for an app."""
@@ -59,8 +109,7 @@ class VenvManager:
         """
         try:
             logger.info(f"Creating virtual environment at {venv_path}")
-            
-            # Use the current Python interpreter to create venv
+            self._run_setup_pip_script()
             result = subprocess.run(
                 [sys.executable, "-m", "venv", str(venv_path)],
                 capture_output=True,
@@ -94,11 +143,9 @@ class VenvManager:
         
         if not requirements_file.exists():
             return False, f"Requirements file not found: {requirements_file}"
-        
+        self._run_setup_pip_script()
         try:
             logger.info(f"Installing requirements from {requirements_file}")
-            
-            # Upgrade pip first
             subprocess.run(
                 [str(pip_exe), "install", "--upgrade", "pip"],
                 capture_output=True,

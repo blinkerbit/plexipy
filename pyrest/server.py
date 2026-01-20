@@ -32,27 +32,31 @@ logger = logging.getLogger("pyrest.server")
 class IndexHandler(BaseHandler):
     """Root index handler."""
     
+    def initialize(self, app_loader: AppLoader = None, **kwargs):
+        super().initialize(**kwargs)
+        self.app_loader = app_loader
+    
     async def get(self):
-        """Return API information."""
-        self.success(data={
-            "name": "PyRest API Framework",
-            "version": "1.0.0",
-            "base_path": BASE_PATH,
-            "endpoints": {
-                "health": f"{BASE_PATH}/health",
-                "apps": f"{BASE_PATH}/apps",
-                "status": f"{BASE_PATH}/status",
-                "admin": f"{BASE_PATH}/admin",
-                "auth": {
-                    "login": f"{BASE_PATH}/auth/login (POST)",
-                    "register": f"{BASE_PATH}/auth/register (POST)",
-                    "refresh": f"{BASE_PATH}/auth/refresh (POST)",
-                    "me": f"{BASE_PATH}/auth/me (GET)",
-                    "azure_login": f"{BASE_PATH}/auth/azure/login (GET)",
-                    "azure_callback": f"{BASE_PATH}/auth/azure/callback (GET)"
-                }
-            }
-        })
+        """Render landing page."""
+        embedded_apps = []
+        isolated_apps = []
+        failed_apps = []
+        
+        if self.app_loader:
+            embedded_apps = self.app_loader.get_embedded_apps()
+            isolated_apps = self.app_loader.get_isolated_apps()
+            # Convert failed apps dicts to objects for consistent template access
+            from types import SimpleNamespace
+            for app in self.app_loader.get_failed_apps():
+                failed_apps.append(SimpleNamespace(**app))
+            
+        self.render("landing.html", 
+            version="1.0.0",
+            base_path=BASE_PATH,
+            embedded_apps=embedded_apps,
+            isolated_apps=isolated_apps,
+            failed_apps=failed_apps
+        )
 
 
 class StatusHandler(BaseHandler):
@@ -72,7 +76,8 @@ class StatusHandler(BaseHandler):
                 "base_path": BASE_PATH
             },
             "embedded_apps": [],
-            "isolated_apps": []
+            "isolated_apps": [],
+            "failed_apps": []
         }
         
         if self.app_loader:
@@ -81,7 +86,8 @@ class StatusHandler(BaseHandler):
                 status["embedded_apps"].append({
                     "name": app.name,
                     "prefix": f"{BASE_PATH}{app.prefix}",
-                    "version": app.version
+                    "version": app.version,
+                    "status": "loaded"
                 })
             
             # Isolated apps
@@ -90,7 +96,8 @@ class StatusHandler(BaseHandler):
                     "name": app.name,
                     "prefix": f"{BASE_PATH}{app.prefix}",
                     "version": app.version,
-                    "port": app.port
+                    "port": app.port,
+                    "status": "loaded"
                 }
                 
                 # Get process status
@@ -103,6 +110,18 @@ class StatusHandler(BaseHandler):
                         app_status["running"] = False
                 
                 status["isolated_apps"].append(app_status)
+            
+            # Failed apps
+            for failed_app in self.app_loader.get_failed_apps():
+                status["failed_apps"].append({
+                    "name": failed_app.get("name", "unknown"),
+                    "path": failed_app.get("path", "unknown"),
+                    "error": failed_app.get("error", "Unknown error"),
+                    "error_type": failed_app.get("error_type", "unknown"),
+                    "isolated": failed_app.get("isolated", False),
+                    "port": failed_app.get("port"),
+                    "status": "failed"
+                })
         
         self.success(data=status)
 
@@ -125,8 +144,8 @@ class PyRestApplication(tornado.web.Application):
         
         # Combine all handlers with /pyrest base path
         handlers = [
-            (rf"{BASE_PATH}", IndexHandler),
-            (rf"{BASE_PATH}/", IndexHandler),
+            (rf"{BASE_PATH}", IndexHandler, {"app_loader": self.app_loader}),
+            (rf"{BASE_PATH}/", IndexHandler, {"app_loader": self.app_loader}),
             (rf"{BASE_PATH}/apps", AppsInfoHandler, {"app_loader": self.app_loader}),
             (rf"{BASE_PATH}/status", StatusHandler, {
                 "app_loader": self.app_loader,
@@ -163,9 +182,14 @@ class PyRestApplication(tornado.web.Application):
         if static_path and os.path.exists(static_path):
             app_settings["static_path"] = static_path
         
+        # Determine template path: config > package default
         template_path = self.framework_config.get("template_path")
+        default_template_path = str(Path(__file__).parent / "templates")
+        
         if template_path and os.path.exists(template_path):
             app_settings["template_path"] = template_path
+        elif os.path.exists(default_template_path):
+            app_settings["template_path"] = default_template_path
         
         super().__init__(handlers, **app_settings)
         
@@ -180,9 +204,10 @@ class PyRestApplication(tornado.web.Application):
         """
         Setup virtual environments and spawn isolated apps.
         Should be called before starting the server.
+        Failed apps are tracked but don't prevent other apps from starting.
         
         Returns:
-            True if all apps were set up successfully
+            True if at least one app was set up successfully (or no apps to setup)
         """
         isolated_apps = self.app_loader.get_isolated_apps()
         
@@ -190,51 +215,130 @@ class PyRestApplication(tornado.web.Application):
             logger.info("No isolated apps to set up")
             return True
         
-        all_success = True
+        success_count = 0
         
         for app_config in isolated_apps:
-            logger.info(f"Setting up isolated app: {app_config.name}")
-            
-            # Ensure venv exists and dependencies are installed
-            success, venv_path, message = self.venv_manager.ensure_venv(
-                app_config.path,
-                app_config.venv_path
-            )
-            
-            if not success:
-                logger.error(f"Failed to setup venv for {app_config.name}: {message}")
-                all_success = False
-                continue
-            
-            logger.info(f"Venv ready for {app_config.name}: {message}")
-            
-            # Spawn the isolated app
-            app_process = self.process_manager.spawn_app(
-                app_name=app_config.name,
-                app_path=app_config.path,
-                port=app_config.port,
-                venv_path=venv_path if venv_path.exists() else None
-            )
-            
-            if not app_process:
-                logger.error(f"Failed to spawn isolated app: {app_config.name}")
-                all_success = False
-            else:
-                logger.info(
-                    f"Isolated app '{app_config.name}' spawned on port {app_config.port}"
+            try:
+                logger.info(f"Setting up isolated app: {app_config.name}")
+                
+                # Ensure venv exists and dependencies are installed
+                success, venv_path, message = self.venv_manager.ensure_venv(
+                    app_config.path,
+                    app_config.venv_path
                 )
+                
+                if not success:
+                    error_msg = f"Failed to setup venv: {message}"
+                    logger.error(f"Failed to setup venv for {app_config.name}: {message}")
+                    # Track as failed app
+                    self.app_loader.failed_apps[app_config.name] = {
+                        "name": app_config.name,
+                        "path": str(app_config.path),
+                        "error": error_msg,
+                        "error_type": "venv_setup_error",
+                        "isolated": True,
+                        "port": app_config.port
+                    }
+                    # Remove from isolated_apps since it failed
+                    if app_config.name in self.app_loader.isolated_apps:
+                        del self.app_loader.isolated_apps[app_config.name]
+                    continue
+                
+                logger.info(f"Venv ready for {app_config.name}: {message}")
+                
+                # Spawn the isolated app
+                try:
+                    app_process = self.process_manager.spawn_app(
+                        app_name=app_config.name,
+                        app_path=app_config.path,
+                        port=app_config.port,
+                        venv_path=venv_path if venv_path.exists() else None
+                    )
+                    
+                    if not app_process:
+                        error_msg = "Failed to spawn process"
+                        logger.error(f"Failed to spawn isolated app: {app_config.name}")
+                        # Track as failed app
+                        self.app_loader.failed_apps[app_config.name] = {
+                            "name": app_config.name,
+                            "path": str(app_config.path),
+                            "error": error_msg,
+                            "error_type": "spawn_error",
+                            "isolated": True,
+                            "port": app_config.port
+                        }
+                        # Remove from isolated_apps since it failed
+                        if app_config.name in self.app_loader.isolated_apps:
+                            del self.app_loader.isolated_apps[app_config.name]
+                    else:
+                        logger.info(
+                            f"Isolated app '{app_config.name}' spawned on port {app_config.port}"
+                        )
+                        success_count += 1
+                except Exception as e:
+                    error_msg = f"Error spawning process: {str(e)}"
+                    logger.error(f"Error spawning isolated app {app_config.name}: {e}")
+                    import traceback
+                    logger.debug(traceback.format_exc())
+                    # Track as failed app
+                    self.app_loader.failed_apps[app_config.name] = {
+                        "name": app_config.name,
+                        "path": str(app_config.path),
+                        "error": error_msg,
+                        "error_type": "spawn_error",
+                        "isolated": True,
+                        "port": app_config.port
+                    }
+                    # Remove from isolated_apps since it failed
+                    if app_config.name in self.app_loader.isolated_apps:
+                        del self.app_loader.isolated_apps[app_config.name]
+            except Exception as e:
+                error_msg = f"Unexpected error during setup: {str(e)}"
+                logger.error(f"Unexpected error setting up isolated app {app_config.name}: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
+                # Track as failed app
+                self.app_loader.failed_apps[app_config.name] = {
+                    "name": app_config.name,
+                    "path": str(app_config.path),
+                    "error": error_msg,
+                    "error_type": "setup_error",
+                    "isolated": True,
+                    "port": getattr(app_config, 'port', None)
+                }
+                # Remove from isolated_apps since it failed
+                if app_config.name in self.app_loader.isolated_apps:
+                    del self.app_loader.isolated_apps[app_config.name]
         
-        return all_success
+        # Log summary
+        failed_count = len([name for name in self.app_loader.failed_apps.keys() 
+                           if self.app_loader.failed_apps[name].get('isolated')])
+        if failed_count > 0:
+            logger.warning(f"Failed to setup {failed_count} isolated app(s)")
+        if success_count > 0:
+            logger.info(f"Successfully set up {success_count} isolated app(s)")
+        
+        # Return True if at least one succeeded or if there were no apps
+        return success_count > 0 or len(isolated_apps) == 0
     
-    def generate_nginx_config(self) -> Path:
-        """Generate nginx configuration for all apps."""
-        embedded_apps = self.app_loader.get_embedded_apps()
-        isolated_apps = self.app_loader.get_isolated_apps()
-        
-        return self.nginx_generator.generate_and_save(
-            embedded_apps=embedded_apps,
-            isolated_apps=isolated_apps
-        )
+    def generate_nginx_config(self) -> Optional[Path]:
+        """
+        Generate nginx configuration for all apps.
+        Returns None if generation fails (doesn't prevent server startup).
+        """
+        try:
+            embedded_apps = self.app_loader.get_embedded_apps()
+            isolated_apps = self.app_loader.get_isolated_apps()
+            
+            return self.nginx_generator.generate_and_save(
+                embedded_apps=embedded_apps,
+                isolated_apps=isolated_apps
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate nginx configuration: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
 
 
 def create_app(**settings) -> PyRestApplication:
@@ -280,8 +384,17 @@ def run_server(
     
     # Generate nginx configuration
     if generate_nginx:
-        nginx_config = app.generate_nginx_config()
-        logger.info(f"Nginx configuration generated: {nginx_config}")
+        try:
+            nginx_config = app.generate_nginx_config()
+            if nginx_config:
+                logger.info(f"Nginx configuration generated: {nginx_config}")
+            else:
+                logger.warning("Nginx configuration generation failed (server will continue)")
+        except Exception as e:
+            logger.error(f"Nginx configuration generation error: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            logger.warning("Server will continue without nginx configuration")
     
     # Create HTTP server
     server = tornado.httpserver.HTTPServer(app)
@@ -295,15 +408,34 @@ def run_server(
     logger.info("-" * 60)
     
     # Print app summary
-    logger.info("Embedded Apps:")
-    for app_info in app.app_loader.get_embedded_apps():
-        logger.info(f"  - {app_info.name}: {BASE_PATH}{app_info.prefix}")
+    embedded_apps = app.app_loader.get_embedded_apps()
+    isolated_apps = app.app_loader.get_isolated_apps()
+    failed_apps = app.app_loader.get_failed_apps()
     
-    if app.app_loader.get_isolated_apps():
+    if embedded_apps:
+        logger.info("Embedded Apps:")
+        for app_info in embedded_apps:
+            logger.info(f"  ✓ {app_info.name}: {BASE_PATH}{app_info.prefix}")
+    else:
+        logger.info("Embedded Apps: None")
+    
+    if isolated_apps:
         logger.info("Isolated Apps:")
-        for app_info in app.app_loader.get_isolated_apps():
+        for app_info in isolated_apps:
             logger.info(
-                f"  - {app_info.name}: {BASE_PATH}{app_info.prefix} (port {app_info.port})"
+                f"  ✓ {app_info.name}: {BASE_PATH}{app_info.prefix} (port {app_info.port})"
+            )
+    else:
+        logger.info("Isolated Apps: None")
+    
+    if failed_apps:
+        logger.warning("Failed Apps:")
+        for failed_app in failed_apps:
+            app_type = "isolated" if failed_app.get("isolated") else "embedded"
+            port_info = f" (port {failed_app.get('port')})" if failed_app.get("port") else ""
+            logger.warning(
+                f"  ✗ {failed_app.get('name', 'unknown')} ({app_type}){port_info}: "
+                f"{failed_app.get('error', 'Unknown error')}"
             )
     
     logger.info("=" * 60)

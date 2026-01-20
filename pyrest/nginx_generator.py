@@ -4,6 +4,7 @@ Generates nginx configuration for routing to embedded and isolated apps.
 """
 
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -206,13 +207,62 @@ class NginxGenerator:
             isolated_apps=isolated_apps
         )
         
+        # Ensure output directory exists
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
         output_path = self.output_dir / filename
         
-        with open(output_path, "w") as f:
-            f.write(config_content)
+        # Resolve to absolute path to avoid any path resolution issues
+        output_path = output_path.resolve()
         
-        logger.info(f"Generated nginx configuration: {output_path}")
-        return output_path
+        # Check if output_path exists as a directory (shouldn't happen, but handle it)
+        if output_path.exists():
+            if output_path.is_dir():
+                logger.warning(f"Output path {output_path} exists as a directory. Removing it.")
+                try:
+                    shutil.rmtree(output_path)
+                except Exception as e:
+                    logger.error(f"Failed to remove directory {output_path}: {e}")
+                    # Use a different filename as fallback
+                    output_path = (self.output_dir / f"{filename}.new").resolve()
+            elif output_path.is_file():
+                # File exists, we'll overwrite it (which is fine)
+                logger.debug(f"Overwriting existing nginx config file: {output_path}")
+        
+        # Double-check right before opening (in case something changed)
+        if output_path.exists() and output_path.is_dir():
+            logger.error(f"Output path {output_path} is still a directory. Using fallback filename.")
+            output_path = (self.output_dir / f"{filename}.new").resolve()
+            # Remove fallback if it's also a directory
+            if output_path.exists() and output_path.is_dir():
+                try:
+                    shutil.rmtree(output_path)
+                except Exception:
+                    pass
+        
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            with open(output_path, "w") as f:
+                f.write(config_content)
+            logger.info(f"Generated nginx configuration: {output_path}")
+            return output_path
+        except (IsADirectoryError, OSError) as e:
+            # If we still get a directory error, try a different filename
+            logger.error(f"Failed to write nginx configuration to {output_path}: {e}")
+            fallback_path = (self.output_dir / f"{filename}.{int(datetime.now().timestamp())}").resolve()
+            try:
+                with open(fallback_path, "w") as f:
+                    f.write(config_content)
+                logger.warning(f"Used fallback path for nginx configuration: {fallback_path}")
+                return fallback_path
+            except Exception as e2:
+                logger.error(f"Failed to write to fallback path {fallback_path}: {e2}")
+                raise
+        except Exception as e:
+            logger.error(f"Failed to write nginx configuration to {output_path}: {e}")
+            raise
     
     def generate_app_summary(
         self,

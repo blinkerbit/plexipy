@@ -55,9 +55,11 @@ COPY --chown=pyrest:pyrest apps/ ./apps/
 COPY --chown=pyrest:pyrest main.py .
 COPY --chown=pyrest:pyrest config.json .
 COPY --chown=pyrest:pyrest auth_config.json .
+COPY --chown=pyrest:pyrest setup_pip.sh ./setup_pip.sh
 
-# Create directories for nginx config and logs
+# Create directories for nginx config and logs, make setup_pip.sh executable
 RUN mkdir -p /app/nginx /app/logs && \
+    chmod +x /app/setup_pip.sh && \
     chown -R pyrest:pyrest /app
 
 # Switch to non-root user

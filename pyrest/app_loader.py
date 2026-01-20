@@ -147,6 +147,7 @@ class AppLoader:
         self.apps_folder = Path(apps_folder or self.config.apps_folder)
         self.loaded_apps: Dict[str, AppConfig] = {}
         self.isolated_apps: Dict[str, AppConfig] = {}
+        self.failed_apps: Dict[str, Dict[str, Any]] = {}  # Track failed apps with error info
         self._handlers: List[Tuple] = []
         self._next_port = self.config.isolated_app_base_port
     
@@ -180,9 +181,25 @@ class AppLoader:
                             logger.info(f"Skipping disabled app: {app_config.name}")
                     
                     except json.JSONDecodeError as e:
+                        error_msg = f"Invalid config.json: {str(e)}"
                         logger.error(f"Invalid config.json in {item.name}: {e}")
+                        self.failed_apps[item.name] = {
+                            "name": item.name,
+                            "path": str(item),
+                            "error": error_msg,
+                            "error_type": "config_error"
+                        }
                     except Exception as e:
+                        error_msg = f"Error loading app: {str(e)}"
                         logger.error(f"Error loading app {item.name}: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
+                        self.failed_apps[item.name] = {
+                            "name": item.name,
+                            "path": str(item),
+                            "error": error_msg,
+                            "error_type": "load_error"
+                        }
                 else:
                     logger.warning(f"No config.json found in {item.name}, skipping")
         
@@ -299,30 +316,96 @@ class AppLoader:
         """
         Discover and load all apps, returning handlers for embedded apps.
         Isolated apps are stored separately for later spawning.
+        Failed apps are tracked but don't prevent other apps from loading.
         """
         all_handlers = []
         apps = self.discover_apps()
         
         for app_config in apps:
-            if app_config.is_isolated:
-                # Isolated app - assign port and store for later spawning
-                self._assign_port(app_config)
-                self.isolated_apps[app_config.name] = app_config
-                logger.info(
-                    f"Discovered isolated app '{app_config.name}' "
-                    f"(port: {app_config.port})"
-                )
-            else:
-                # Embedded app - load handlers into main process
-                module = self.load_app_module(app_config)
-                
-                if module:
-                    handlers = self.get_app_handlers(app_config, module)
-                    all_handlers.extend(handlers)
-                    self.loaded_apps[app_config.name] = app_config
-                    logger.info(f"Loaded embedded app '{app_config.name}' with {len(handlers)} handlers")
+            try:
+                if app_config.is_isolated:
+                    # Isolated app - assign port and store for later spawning
+                    try:
+                        self._assign_port(app_config)
+                        self.isolated_apps[app_config.name] = app_config
+                        logger.info(
+                            f"Discovered isolated app '{app_config.name}' "
+                            f"(port: {app_config.port})"
+                        )
+                    except Exception as e:
+                        error_msg = f"Failed to setup isolated app: {str(e)}"
+                        logger.error(f"Error setting up isolated app {app_config.name}: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
+                        self.failed_apps[app_config.name] = {
+                            "name": app_config.name,
+                            "path": str(app_config.path),
+                            "error": error_msg,
+                            "error_type": "isolated_setup_error",
+                            "isolated": True
+                        }
+                else:
+                    # Embedded app - load handlers into main process
+                    try:
+                        module = self.load_app_module(app_config)
+                        
+                        if module:
+                            handlers = self.get_app_handlers(app_config, module)
+                            if handlers:
+                                all_handlers.extend(handlers)
+                                self.loaded_apps[app_config.name] = app_config
+                                logger.info(f"Loaded embedded app '{app_config.name}' with {len(handlers)} handlers")
+                            else:
+                                # Module loaded but no handlers found
+                                error_msg = "No handlers found in module"
+                                logger.warning(f"App {app_config.name} loaded but has no handlers")
+                                self.failed_apps[app_config.name] = {
+                                    "name": app_config.name,
+                                    "path": str(app_config.path),
+                                    "error": error_msg,
+                                    "error_type": "no_handlers"
+                                }
+                        else:
+                            # Module failed to load
+                            if app_config.name not in self.failed_apps:
+                                self.failed_apps[app_config.name] = {
+                                    "name": app_config.name,
+                                    "path": str(app_config.path),
+                                    "error": "Failed to load module",
+                                    "error_type": "module_load_error"
+                                }
+                    except Exception as e:
+                        error_msg = f"Error loading embedded app: {str(e)}"
+                        logger.error(f"Error loading embedded app {app_config.name}: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
+                        self.failed_apps[app_config.name] = {
+                            "name": app_config.name,
+                            "path": str(app_config.path),
+                            "error": error_msg,
+                            "error_type": "load_error"
+                        }
+            except Exception as e:
+                # Catch any unexpected errors during app processing
+                error_msg = f"Unexpected error processing app: {str(e)}"
+                logger.error(f"Unexpected error processing app {app_config.name}: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
+                self.failed_apps[app_config.name] = {
+                    "name": app_config.name,
+                    "path": str(app_config.path) if hasattr(app_config, 'path') else "unknown",
+                    "error": error_msg,
+                    "error_type": "unexpected_error"
+                }
         
         self._handlers = all_handlers
+        
+        # Log summary
+        if self.failed_apps:
+            logger.warning(f"Failed to load {len(self.failed_apps)} app(s): {list(self.failed_apps.keys())}")
+        else:
+            logger.info("All apps loaded successfully")
+        
         return all_handlers
     
     def get_isolated_apps(self) -> List[AppConfig]:
@@ -346,7 +429,8 @@ class AppLoader:
                 "prefix": f"{BASE_PATH}{app.prefix}",
                 "enabled": app.enabled,
                 "isolated": False,
-                "port": self.config.port
+                "port": self.config.port,
+                "status": "loaded"
             })
         
         # Isolated apps
@@ -358,10 +442,15 @@ class AppLoader:
                 "prefix": f"{BASE_PATH}{app.prefix}",
                 "enabled": app.enabled,
                 "isolated": True,
-                "port": app.port
+                "port": app.port,
+                "status": "loaded"
             })
         
         return apps_info
+    
+    def get_failed_apps(self) -> List[Dict[str, Any]]:
+        """Get information about apps that failed to load."""
+        return list(self.failed_apps.values())
 
 
 class AppsInfoHandler(BaseHandler):

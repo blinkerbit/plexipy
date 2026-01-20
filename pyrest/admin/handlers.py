@@ -77,7 +77,8 @@ class AdminAPIStatusHandler(AdminBaseHandler):
             },
             "apps": {
                 "embedded": [],
-                "isolated": []
+                "isolated": [],
+                "failed": []
             },
             "processes": []
         }
@@ -91,7 +92,8 @@ class AdminAPIStatusHandler(AdminBaseHandler):
                     "description": app.description,
                     "prefix": f"{BASE_PATH}{app.prefix}",
                     "enabled": app.enabled,
-                    "auth_required": app.auth_required
+                    "auth_required": app.auth_required,
+                    "status": "loaded"
                 })
             
             # Get isolated apps
@@ -102,7 +104,8 @@ class AdminAPIStatusHandler(AdminBaseHandler):
                     "description": app.description,
                     "prefix": f"{BASE_PATH}{app.prefix}",
                     "port": app.port,
-                    "enabled": app.enabled
+                    "enabled": app.enabled,
+                    "status": "loaded"
                 }
                 
                 # Get process status
@@ -116,6 +119,18 @@ class AdminAPIStatusHandler(AdminBaseHandler):
                         }
                 
                 status["apps"]["isolated"].append(app_info)
+            
+            # Get failed apps
+            for failed_app in self.app_loader.get_failed_apps():
+                status["apps"]["failed"].append({
+                    "name": failed_app.get("name", "unknown"),
+                    "path": failed_app.get("path", "unknown"),
+                    "error": failed_app.get("error", "Unknown error"),
+                    "error_type": failed_app.get("error_type", "unknown"),
+                    "isolated": failed_app.get("isolated", False),
+                    "port": failed_app.get("port"),
+                    "status": "failed"
+                })
         
         # Get all process statuses
         if self.process_manager:

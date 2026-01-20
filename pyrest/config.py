@@ -343,9 +343,13 @@ class EnvConfig:
         """Load environment variables from a .env file."""
         if self._env_file_loaded:
             return
-            
+
         env_path = Path(env_file)
-        if env_path.exists():
+        if not env_path.is_file():
+            # Skip if missing, or if it's a directory (e.g. Docker mount created .env as dir)
+            return
+
+        try:
             with open(env_path, "r") as f:
                 for line in f:
                     line = line.strip()
@@ -355,7 +359,9 @@ class EnvConfig:
                         value = value.strip().strip('"').strip("'")
                         os.environ[key] = value
                         self._custom_vars[key] = value
-            self._env_file_loaded = True
+        except (OSError, IOError):
+            pass
+        self._env_file_loaded = True
     
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
         """Get an environment variable."""

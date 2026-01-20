@@ -1,0 +1,15 @@
+__pycache__
+pyrest/__pycache__
+apps/__pycache__
+tests/__pycache__
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.nox
+coverage.xml
+*.cover
+.hypothesis
+.env
+.venv
+logs

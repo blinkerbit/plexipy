@@ -15,9 +15,10 @@ class BaseHandler(tornado.web.RequestHandler):
     Base handler with common functionality for all API endpoints.
     """
     
-    def initialize(self, app_config: Optional[Dict[str, Any]] = None):
+    def initialize(self, app_config: Optional[Dict[str, Any]] = None, app_config_parser: Any = None):
         """Initialize handler with optional app configuration."""
         self.app_config = app_config or {}
+        self.app_config_parser = app_config_parser
         self.framework_config = get_config()
         self.env = get_env()
         self._current_user = None
@@ -26,6 +27,10 @@ class BaseHandler(tornado.web.RequestHandler):
         """Set default headers including CORS if enabled."""
         self.set_header("Content-Type", "application/json")
         
+        # Ensure framework_config is available (set_default_headers runs before initialize)
+        if not hasattr(self, "framework_config"):
+            self.framework_config = get_config()
+
         if self.framework_config.get("cors_enabled", True):
             origin = self.request.headers.get("Origin", "*")
             allowed_origins = self.framework_config.get("cors_origins", ["*"])

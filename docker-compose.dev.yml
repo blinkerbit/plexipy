@@ -2,12 +2,22 @@
 # 
 # Usage:
 #   docker-compose -f docker-compose.dev.yml up -d
-#   docker-compose -f docker-compose.dev.yml logs -f
+#   docker-compose -f docker-compose.dev.yml logs -f pyrest-dev
+#   docker-compose -f docker-compose.dev.yml exec pyrest-dev bash
 #
 # Features:
-#   - Hot reload with volume mounts
+#   - Hot reload with volume mounts (changes reflect immediately)
 #   - Debug mode enabled
-#   - No nginx (direct access to PyRest)
+#   - Full source code access (read-write)
+#   - Logs directory mounted for easy access
+#   - No nginx (direct access to PyRest on port 8000)
+#
+# Volume Mounts:
+#   - Source code: ./pyrest, ./apps (read-write for live editing)
+#   - Config files: config.json, auth_config.json (read-write)
+#   - Logs: ./logs (persistent logs outside container)
+#   - Nginx config: ./nginx (for generated configs)
+#   - setup_pip.sh: pip proxy configuration
 
 version: '3.8'
 
@@ -25,13 +35,18 @@ services:
       - PYREST_PORT=8000
       - PYREST_DEBUG=true
     volumes:
-      # Mount source code for hot reload
-      - ./pyrest:/app/pyrest:ro
-      - ./apps:/app/apps:ro
-      - ./main.py:/app/main.py:ro
-      - ./config.json:/app/config.json:ro
-      - ./auth_config.json:/app/auth_config.json:ro
+      # Mount source code for hot reload (read-write for development)
+      - ./pyrest:/app/pyrest
+      - ./apps:/app/apps
+      - ./main.py:/app/main.py
+      - ./config.json:/app/config.json
+      - ./auth_config.json:/app/auth_config.json
+      - ./setup_pip.sh:/app/setup_pip.sh
       - ./nginx:/app/nginx
+      - ./logs:/app/logs
+      # Mount .env file if it exists (optional)
+      - ./.env:/app/.env:ro
+    # Ensure logs directory exists (created automatically if missing)
     command: ["python", "main.py", "--debug", "--no-isolated"]
     networks:
       - pyrest-dev-network
