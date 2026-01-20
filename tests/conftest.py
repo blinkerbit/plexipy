@@ -95,7 +95,8 @@ def temp_auth_config_file(temp_dir: Path, sample_auth_config: Dict[str, Any]) ->
 @pytest.fixture
 def temp_app_dir(temp_dir: Path, sample_app_config: Dict[str, Any]) -> Path:
     """Create a temporary app directory with config and handlers."""
-    apps_dir = temp_dir / "apps"
+    # Use source_apps to avoid conflict with app_loader's apps folder
+    apps_dir = temp_dir / "source_apps"
     app_dir = apps_dir / "testapp"
     app_dir.mkdir(parents=True)
     
@@ -125,7 +126,8 @@ def get_handlers():
 @pytest.fixture
 def temp_isolated_app_dir(temp_dir: Path) -> Path:
     """Create a temporary isolated app directory with requirements.txt."""
-    apps_dir = temp_dir / "apps"
+    # Use source_apps to avoid conflict with app_loader's apps folder
+    apps_dir = temp_dir / "source_apps"
     app_dir = apps_dir / "isolatedapp"
     app_dir.mkdir(parents=True)
     
@@ -178,3 +180,81 @@ def mock_env_vars():
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
+
+
+@pytest.fixture
+def sample_tm1_config() -> Dict[str, Any]:
+    """Sample TM1 app configuration with multiple instances."""
+    return {
+        "name": "tm1app",
+        "version": "1.0.0",
+        "settings": {
+            "default_instance": "production",
+            "session_context": "Test Session"
+        },
+        "os_vars": {
+            "TM1_DEFAULT_INSTANCE": "production"
+        },
+        "tm1_instances": {
+            "production": {
+                "description": "Production TM1 Server",
+                "connection_type": "onprem",
+                "server": "prod-tm1.local",
+                "port": "8010",
+                "ssl": True,
+                "user": "admin",
+                "password": "secret"
+            },
+            "development": {
+                "description": "Development TM1 Server",
+                "connection_type": "onprem",
+                "server": "dev-tm1.local",
+                "port": "8011",
+                "ssl": True
+            },
+            "cloud": {
+                "description": "Cloud TM1 Instance",
+                "connection_type": "cloud",
+                "cloud_region": "us-east",
+                "cloud_tenant": "test-tenant",
+                "cloud_api_key": "test-api-key"
+            }
+        }
+    }
+
+
+@pytest.fixture
+def temp_log_dir(temp_dir: Path) -> Path:
+    """Create a temporary log directory."""
+    log_dir = temp_dir / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir
+
+
+@pytest.fixture
+def reset_tm1_manager():
+    """Reset TM1ConnectionManager before and after test."""
+    from pyrest.utils.tm1 import TM1ConnectionManager
+    
+    # Reset before test
+    TM1ConnectionManager._instances.clear()
+    TM1ConnectionManager._connections.clear()
+    TM1ConnectionManager._initialized = False
+    TM1ConnectionManager._default_instance = "default"
+    
+    yield
+    
+    # Reset after test
+    TM1ConnectionManager._instances.clear()
+    TM1ConnectionManager._connections.clear()
+    TM1ConnectionManager._initialized = False
+    TM1ConnectionManager._default_instance = "default"
+
+
+@pytest.fixture
+def reset_auth_config():
+    """Reset AuthConfig singleton before test."""
+    from pyrest.auth import AuthConfig
+    AuthConfig._instance = None
+    yield
+    AuthConfig._instance = None

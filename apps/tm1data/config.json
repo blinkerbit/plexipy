@@ -1,14 +1,41 @@
 {
   "name": "tm1data",
-  "version": "1.0.0",
-  "description": "TM1 Data API - An ISOLATED app with tm1py dependency",
+  "version": "2.0.0",
+  "description": "TM1 Data API - Supports multiple TM1 instances (Cloud and On-Premise)",
   "enabled": true,
   "auth_required": true,
   "port": 8001,
   "venv_path": ".venv",
   "settings": {
-    "tm1_server": "localhost",
-    "tm1_port": 8010,
-    "tm1_ssl": true
+    "default_instance": "${TM1_DEFAULT_INSTANCE:-default}",
+    "session_context": "PyRest TM1Data App"
+  },
+  "os_vars": {
+    "TM1_DEFAULT_INSTANCE": "default",
+    "TM1_SESSION_CONTEXT": "PyRest TM1Data App"
+  },
+  "tm1_instances": {
+    "default": {
+      "description": "Default TM1 On-Premise instance",
+      "connection_type": "onprem",
+      "server": "${TM1_DEFAULT_SERVER:-localhost}",
+      "port": "${TM1_DEFAULT_PORT:-8010}",
+      "ssl": true,
+      "user": "${TM1_DEFAULT_USER:-}",
+      "password": "${TM1_DEFAULT_PASSWORD:-}",
+      "namespace": "",
+      "gateway": "",
+      "cam_passport": "",
+      "integrated_login": false
+    },
+    "cloud_example": {
+      "description": "Example TM1 Cloud instance (IBM Planning Analytics)",
+      "connection_type": "cloud",
+      "cloud_region": "${TM1_CLOUD_REGION:-us-east}",
+      "cloud_tenant": "${TM1_CLOUD_TENANT:-}",
+      "cloud_api_key": "${TM1_CLOUD_API_KEY:-}",
+      "instance": "${TM1_CLOUD_INSTANCE:-}",
+      "ssl": true
+    }
   }
 }

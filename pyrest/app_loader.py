@@ -14,8 +14,9 @@ import logging
 
 import tornado.web
 
-from .config import get_config
+from .config import get_config, AppConfigParser
 from .handlers import BaseHandler, BASE_PATH
+from .utils.logging import setup_app_logging, AppLogger
 
 logger = logging.getLogger("pyrest.app_loader")
 
@@ -23,24 +24,59 @@ logger = logging.getLogger("pyrest.app_loader")
 class AppConfig:
     """
     Configuration for a loaded app.
+    
+    Uses AppConfigParser to handle os_vars and environment variable resolution.
+    Each app gets its own file logger for isolated logging.
     """
+    
+    # Default log directory for all apps
+    LOG_DIR = "logs"
     
     def __init__(self, app_path: Path, config_data: Dict[str, Any]):
         self.path = app_path
         self.name = config_data.get("name", app_path.name)
-        self.version = config_data.get("version", "1.0.0")
-        self.description = config_data.get("description", "")
-        self.enabled = config_data.get("enabled", True)
-        self.prefix = config_data.get("prefix", f"/{self.name}")
-        self.settings = config_data.get("settings", {})
-        self.auth_required = config_data.get("auth_required", False)
-        self.allowed_roles = config_data.get("allowed_roles", [])
-        self.venv_path = config_data.get("venv_path", ".venv")
         self._raw_config = config_data
         
+        # Check if isolated before parsing (needed for os_vars handling)
+        self._check_isolated = (self.path / "requirements.txt").exists()
+        
+        # Use AppConfigParser for enhanced config parsing with os_vars support
+        self._config_parser = AppConfigParser(
+            app_name=self.name,
+            config_data=config_data,
+            is_isolated=self._check_isolated
+        )
+        
+        # Get resolved config values
+        resolved = self._config_parser.get_resolved_config()
+        
+        self.version = resolved.get("version", "1.0.0")
+        self.description = resolved.get("description", "")
+        self.enabled = resolved.get("enabled", True)
+        self.prefix = resolved.get("prefix", f"/{self.name}")
+        self.settings = resolved.get("settings", {})
+        self.auth_required = resolved.get("auth_required", False)
+        self.allowed_roles = resolved.get("allowed_roles", [])
+        self.venv_path = resolved.get("venv_path", ".venv")
+        
         # Port configuration (None means auto-assign)
-        self._port = config_data.get("port", None)
+        self._port = resolved.get("port", None)
         self._assigned_port: Optional[int] = None
+        
+        # Setup app-specific logging
+        log_level = self.settings.get("log_level", "INFO")
+        log_dir = self.settings.get("log_dir", self.LOG_DIR)
+        self._app_logger = setup_app_logging(
+            app_name=self.name,
+            log_dir=log_dir,
+            log_level=log_level,
+            console_output=False
+        )
+        
+        self._app_logger.info(f"App '{self.name}' v{self.version} initialized")
+        self._app_logger.info(f"Loaded {len(self._config_parser.get_all_os_vars())} os_vars")
+        
+        logger.info(f"Loaded app config for '{self.name}' with {len(self._config_parser.get_all_os_vars())} os_vars")
     
     @property
     def has_requirements(self) -> bool:
@@ -65,14 +101,38 @@ class AppConfig:
         """Set the assigned port."""
         self._assigned_port = value
     
+    @property
+    def config_parser(self) -> AppConfigParser:
+        """Get the config parser for this app."""
+        return self._config_parser
+    
+    @property
+    def app_logger(self) -> AppLogger:
+        """Get the app-specific logger."""
+        return self._app_logger
+    
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a configuration value."""
-        return self._raw_config.get(key, default)
+        """Get a configuration value (resolved)."""
+        return self._config_parser.get(key, default)
+    
+    def get_os_var(self, param: str, default: Optional[str] = None) -> Optional[str]:
+        """Get an os_var by parameter name."""
+        return self._config_parser.get_os_var(param, default)
+    
+    def get_env_dict(self) -> Dict[str, str]:
+        """
+        Get environment variables for this app.
+        
+        Useful for passing to isolated app processes.
+        """
+        return self._config_parser.to_env_dict()
     
     def __repr__(self):
         isolated_str = " [isolated]" if self.is_isolated else ""
         port_str = f" port={self.port}" if self.port else ""
-        return f"<AppConfig name={self.name} prefix={self.prefix}{isolated_str}{port_str}>"
+        os_vars_count = len(self._config_parser.get_all_os_vars())
+        os_vars_str = f" os_vars={os_vars_count}" if os_vars_count > 0 else ""
+        return f"<AppConfig name={self.name} prefix={self.prefix}{isolated_str}{port_str}{os_vars_str}>"
 
 
 class AppLoader:
@@ -216,8 +276,9 @@ class AppLoader:
                 else:
                     init_kwargs = {}
                 
-                # Add app config to init kwargs
+                # Add app config to init kwargs (both raw and resolved)
                 init_kwargs["app_config"] = app_config._raw_config
+                init_kwargs["app_config_parser"] = app_config.config_parser
                 
                 handlers.append((full_path, handler_class, init_kwargs))
                 logger.debug(f"Registered handler: {full_path} -> {handler_class.__name__}")

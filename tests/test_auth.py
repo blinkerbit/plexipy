@@ -336,7 +336,7 @@ class TestAuthDecorators:
         mock_handler = MagicMock()
         mock_handler._current_user = {"sub": "testuser", "roles": ["admin"]}
         
-        @require_roles("admin")
+        @require_roles(["admin"])
         async def test_method(self):
             return "success"
         
@@ -350,7 +350,7 @@ class TestAuthDecorators:
         mock_handler = MagicMock()
         mock_handler._current_user = {"sub": "testuser", "roles": ["user"]}
         
-        @require_roles("admin")
+        @require_roles(["admin"])
         async def test_method(self):
             return "success"
         

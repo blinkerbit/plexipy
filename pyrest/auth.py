@@ -304,6 +304,83 @@ class AzureADAuth:
             }
         except Exception as e:
             raise AuthError(f"Token validation failed: {str(e)}")
+    
+    def decode_token_claims(self, token: str) -> Dict[str, Any]:
+        """
+        Decode an Azure AD token without full validation.
+        Useful for extracting claims like roles.
+        
+        Returns decoded token claims including:
+        - roles: App roles assigned to the user
+        - groups: Group memberships (if configured)
+        - oid: Object ID of the user
+        - preferred_username: User's email/UPN
+        """
+        try:
+            # Decode without verification to get claims
+            claims = jwt.decode(token, options={"verify_signature": False})
+            return claims
+        except jwt.DecodeError as e:
+            raise AuthError(f"Failed to decode token: {str(e)}")
+    
+    def extract_roles(self, token: str) -> List[str]:
+        """
+        Extract Azure AD app roles from a token.
+        
+        Roles are configured in Azure AD App Registration under
+        "App roles" and assigned to users/groups.
+        
+        Returns list of role names assigned to the user.
+        """
+        try:
+            claims = self.decode_token_claims(token)
+            # Azure AD puts roles in the 'roles' claim
+            roles = claims.get("roles", [])
+            if isinstance(roles, str):
+                roles = [roles]
+            return roles
+        except AuthError:
+            return []
+    
+    def extract_groups(self, token: str) -> List[str]:
+        """
+        Extract Azure AD group memberships from a token.
+        
+        Requires "groups" claim to be configured in Azure AD.
+        
+        Returns list of group IDs the user belongs to.
+        """
+        try:
+            claims = self.decode_token_claims(token)
+            groups = claims.get("groups", [])
+            if isinstance(groups, str):
+                groups = [groups]
+            return groups
+        except AuthError:
+            return []
+    
+    def extract_user_info_from_token(self, token: str) -> Dict[str, Any]:
+        """
+        Extract user information from token claims.
+        
+        Returns a dictionary with user details.
+        """
+        try:
+            claims = self.decode_token_claims(token)
+            return {
+                "oid": claims.get("oid"),  # Object ID
+                "sub": claims.get("sub"),  # Subject
+                "name": claims.get("name"),
+                "email": claims.get("preferred_username") or claims.get("email") or claims.get("upn"),
+                "given_name": claims.get("given_name"),
+                "family_name": claims.get("family_name"),
+                "roles": claims.get("roles", []),
+                "groups": claims.get("groups", []),
+                "tenant_id": claims.get("tid"),
+                "app_id": claims.get("azp") or claims.get("appid"),
+            }
+        except AuthError:
+            return {}
 
 
 class AuthManager:
@@ -424,14 +501,17 @@ def authenticated(method: Callable) -> Callable:
     return wrapper
 
 
-def require_roles(*roles: str) -> Callable:
+def require_roles(allowed_roles: List[str]) -> Callable:
     """
-    Decorator for requiring specific roles.
+    Decorator for requiring specific roles (works with JWT tokens).
+    
+    Args:
+        allowed_roles: List of role names that are allowed access
     
     Usage:
         class AdminHandler(BaseHandler):
             @authenticated
-            @require_roles("admin", "superuser")
+            @require_roles(["admin", "superuser"])
             async def get(self):
                 ...
     """
@@ -445,10 +525,204 @@ def require_roles(*roles: str) -> Callable:
                 return
             
             user_roles = user.get("roles", [])
-            if not any(role in user_roles for role in roles):
+            if not any(role in user_roles for role in allowed_roles):
                 self.set_status(403)
-                self.write({"error": "Insufficient permissions"})
+                self.write({
+                    "error": "Insufficient permissions",
+                    "required_roles": allowed_roles,
+                    "user_roles": user_roles
+                })
                 return
+            
+            return await method(self, *args, **kwargs)
+        
+        return wrapper
+    return decorator
+
+
+def azure_ad_authenticated(method: Callable) -> Callable:
+    """
+    Decorator for requiring Azure AD authentication on handler methods.
+    
+    Validates the Azure AD token and extracts user info including roles.
+    Sets self._current_user with user details and self._azure_roles with roles.
+    
+    Usage:
+        class MyHandler(BaseHandler):
+            @azure_ad_authenticated
+            async def get(self):
+                user = self._current_user
+                roles = self._azure_roles
+                ...
+    """
+    @functools.wraps(method)
+    async def wrapper(self, *args, **kwargs):
+        auth_header = self.request.headers.get("Authorization", "")
+        
+        if not auth_header.startswith("Bearer "):
+            self.set_status(401)
+            self.write({"error": "Missing or invalid Authorization header"})
+            return
+        
+        token = auth_header[7:]  # Remove "Bearer " prefix
+        
+        try:
+            auth_manager = get_auth_manager()
+            azure_auth = auth_manager.azure_auth
+            
+            # Extract user info and roles from Azure AD token
+            user_info = azure_auth.extract_user_info_from_token(token)
+            roles = azure_auth.extract_roles(token)
+            
+            if not user_info.get("oid") and not user_info.get("sub"):
+                raise AuthError("Invalid token: missing user identifier")
+            
+            # Set user info on handler
+            self._current_user = user_info
+            self._azure_roles = roles
+            self._azure_token = token
+            
+        except AuthError as e:
+            self.set_status(401)
+            self.write({"error": str(e)})
+            return
+        except Exception as e:
+            self.set_status(401)
+            self.write({"error": f"Token validation failed: {str(e)}"})
+            return
+        
+        return await method(self, *args, **kwargs)
+    
+    return wrapper
+
+
+def require_azure_roles(allowed_roles: List[str]) -> Callable:
+    """
+    Decorator for requiring specific Azure AD app roles.
+    
+    Must be used after @azure_ad_authenticated decorator.
+    Checks if the user has any of the specified roles configured
+    in Azure AD App Registration.
+    
+    Args:
+        allowed_roles: List of Azure AD app role names that are allowed access
+    
+    Usage:
+        class AdminHandler(BaseHandler):
+            @azure_ad_authenticated
+            @require_azure_roles(["Admin", "DataManager"])
+            async def get(self):
+                ...
+    
+    Azure AD Setup:
+        1. Go to Azure Portal > App Registrations > Your App
+        2. Click "App roles" in the left menu
+        3. Create roles (e.g., "Admin", "Reader", "DataManager")
+        4. Assign roles to users/groups in "Enterprise Applications"
+    """
+    def decorator(method: Callable) -> Callable:
+        @functools.wraps(method)
+        async def wrapper(self, *args, **kwargs):
+            # Check if azure_ad_authenticated was applied
+            azure_roles = getattr(self, "_azure_roles", None)
+            user = getattr(self, "_current_user", None)
+            
+            if azure_roles is None:
+                self.set_status(401)
+                self.write({"error": "Azure AD authentication required"})
+                return
+            
+            # Check if user has any of the allowed roles
+            if not any(role in azure_roles for role in allowed_roles):
+                self.set_status(403)
+                self.write({
+                    "error": "Insufficient permissions",
+                    "message": f"This endpoint requires one of the following roles: {', '.join(allowed_roles)}",
+                    "required_roles": allowed_roles,
+                    "user_roles": azure_roles,
+                    "user": user.get("email") if user else None
+                })
+                return
+            
+            return await method(self, *args, **kwargs)
+        
+        return wrapper
+    return decorator
+
+
+def azure_ad_protected(allowed_roles: List[str] = None) -> Callable:
+    """
+    Combined decorator for Azure AD authentication with optional role checking.
+    
+    This is a convenience decorator that combines @azure_ad_authenticated
+    and @require_azure_roles into a single decorator.
+    
+    Args:
+        allowed_roles: Optional list of Azure AD app role names. 
+                      If None or empty, only authentication is required.
+    
+    Usage:
+        # Require authentication only
+        class PublicHandler(BaseHandler):
+            @azure_ad_protected()
+            async def get(self):
+                ...
+        
+        # Require authentication + specific roles
+        class AdminHandler(BaseHandler):
+            @azure_ad_protected(["Admin", "SuperUser"])
+            async def get(self):
+                ...
+    """
+    def decorator(method: Callable) -> Callable:
+        @functools.wraps(method)
+        async def wrapper(self, *args, **kwargs):
+            auth_header = self.request.headers.get("Authorization", "")
+            
+            if not auth_header.startswith("Bearer "):
+                self.set_status(401)
+                self.write({"error": "Missing or invalid Authorization header"})
+                return
+            
+            token = auth_header[7:]  # Remove "Bearer " prefix
+            
+            try:
+                auth_manager = get_auth_manager()
+                azure_auth = auth_manager.azure_auth
+                
+                # Extract user info and roles from Azure AD token
+                user_info = azure_auth.extract_user_info_from_token(token)
+                roles = azure_auth.extract_roles(token)
+                
+                if not user_info.get("oid") and not user_info.get("sub"):
+                    raise AuthError("Invalid token: missing user identifier")
+                
+                # Set user info on handler
+                self._current_user = user_info
+                self._azure_roles = roles
+                self._azure_token = token
+                
+            except AuthError as e:
+                self.set_status(401)
+                self.write({"error": str(e)})
+                return
+            except Exception as e:
+                self.set_status(401)
+                self.write({"error": f"Token validation failed: {str(e)}"})
+                return
+            
+            # Check roles if specified
+            if allowed_roles and len(allowed_roles) > 0:
+                if not any(role in roles for role in allowed_roles):
+                    self.set_status(403)
+                    self.write({
+                        "error": "Insufficient permissions",
+                        "message": f"This endpoint requires one of the following roles: {', '.join(allowed_roles)}",
+                        "required_roles": allowed_roles,
+                        "user_roles": roles,
+                        "user": user_info.get("email")
+                    })
+                    return
             
             return await method(self, *args, **kwargs)
         
