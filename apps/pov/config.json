@@ -1,0 +1,11 @@
+{
+    "name": "pov",
+    "prefix": "/pov",
+    "description": "TM1 Point of View - Fetch, Add, Update cube values",
+    "version": "1.0.0",
+    "enabled": true,
+    "settings": {
+        "default_cube": "SalesCube",
+        "default_dimension_order": ["Year", "Region", "Product", "Measure"]
+    }
+}

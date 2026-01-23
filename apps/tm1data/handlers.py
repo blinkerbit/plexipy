@@ -23,8 +23,14 @@ import os
 import json
 import time
 from typing import Dict, Any, Optional, List
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 import tornado.web
+import tornado.ioloop
+
+# Thread pool for async TM1 operations (TM1py is blocking)
+TM1_EXECUTOR = ThreadPoolExecutor(max_workers=16)
 
 # Import TM1 utilities from pyrest.utils
 try:
@@ -161,6 +167,16 @@ class TM1BaseHandler(BaseHandler):
                 duration_ms=duration_ms,
             )
     
+    async def run_tm1_async(self, func, *args, **kwargs):
+        """
+        Run a blocking TM1 operation asynchronously in a thread pool.
+        
+        Usage:
+            result = await self.run_tm1_async(some_blocking_func, arg1, arg2)
+        """
+        loop = tornado.ioloop.IOLoop.current()
+        return await loop.run_in_executor(TM1_EXECUTOR, partial(func, *args, **kwargs))
+    
     def get_instance_name(self, instance_name: str = None) -> str:
         """Get the instance name from parameter or query string."""
         if instance_name:
@@ -255,15 +271,22 @@ class TM1InstanceCubesHandler(TM1BaseHandler):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
         
+        def _get_cubes_sync(inst_name):
+            """Blocking TM1 operation to get cube names."""
+            tm1 = TM1ConnectionManager.get_connection(inst_name)
+            if not tm1:
+                return None
+            return tm1.cubes.get_all_names()
+        
         start_time = time.time()
         try:
-            tm1 = TM1ConnectionManager.get_connection(instance_name)
-            if not tm1:
+            cubes = await self.run_tm1_async(_get_cubes_sync, instance_name)
+            
+            if cubes is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 self.log_tm1_operation("get_cubes", instance_name, False)
                 return
             
-            cubes = tm1.cubes.get_all_names()
             duration_ms = (time.time() - start_time) * 1000
             
             self.log_tm1_operation("get_cubes", instance_name, True, duration_ms, 
@@ -301,14 +324,21 @@ class TM1InstanceCubeDimensionsHandler(TM1BaseHandler):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
         
+        def _get_dimensions_sync(inst_name, cube):
+            """Blocking TM1 operation to get cube dimensions."""
+            tm1 = TM1ConnectionManager.get_connection(inst_name)
+            if not tm1:
+                return None
+            return tm1.cubes.get(cube).dimensions
+        
         start_time = time.time()
         try:
-            tm1 = TM1ConnectionManager.get_connection(instance_name)
-            if not tm1:
+            dimensions = await self.run_tm1_async(_get_dimensions_sync, instance_name, cube_name)
+            
+            if dimensions is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 return
             
-            cube = tm1.cubes.get(cube_name)
             duration_ms = (time.time() - start_time) * 1000
             
             self.log_tm1_operation("get_cube_dimensions", instance_name, True, duration_ms,
@@ -317,7 +347,7 @@ class TM1InstanceCubeDimensionsHandler(TM1BaseHandler):
             self.success(data={
                 "instance": instance_name,
                 "cube": cube_name,
-                "dimensions": cube.dimensions
+                "dimensions": dimensions
             })
             
         except Exception as e:
@@ -353,23 +383,28 @@ class TM1InstanceQueryHandler(TM1BaseHandler):
             self.error("MDX query is required", 400)
             return
         
-        start_time = time.time()
-        try:
-            tm1 = TM1ConnectionManager.get_connection(instance_name)
+        def _execute_mdx_sync(inst_name, mdx_query):
+            """Blocking TM1 operation to execute MDX query."""
+            tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
-                self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
-                return
+                return None
             
-            # Execute MDX and get cellset
-            cellset = tm1.cells.execute_mdx(mdx)
-            
-            # Convert to simple format
+            cellset = tm1.cells.execute_mdx(mdx_query)
             result = []
             for cell in cellset:
                 result.append({
                     "coordinates": cell.get("Ordinal"),
                     "value": cell.get("Value")
                 })
+            return result
+        
+        start_time = time.time()
+        try:
+            result = await self.run_tm1_async(_execute_mdx_sync, instance_name, mdx)
+            
+            if result is None:
+                self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
+                return
             
             duration_ms = (time.time() - start_time) * 1000
             self.log_tm1_operation("execute_mdx", instance_name, True, duration_ms,
@@ -403,8 +438,11 @@ class TM1InstanceStatusHandler(TM1BaseHandler):
             self.error("TM1ConnectionManager not available", 503)
             return
         
-        # Use the built-in status method
-        status = TM1ConnectionManager.get_connection_status(instance_name)
+        def _get_status_sync(inst_name):
+            """Get connection status (may involve connection test)."""
+            return TM1ConnectionManager.get_connection_status(inst_name)
+        
+        status = await self.run_tm1_async(_get_status_sync, instance_name)
         
         if not status.get("configured"):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
@@ -432,18 +470,20 @@ class TM1InstanceReconnectHandler(TM1BaseHandler):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
         
+        def _reconnect_sync(inst_name):
+            """Blocking reconnect operation."""
+            TM1ConnectionManager.reset_connection(inst_name)
+            tm1 = TM1ConnectionManager.get_connection(inst_name)
+            if tm1:
+                return tm1.server.get_server_name()
+            return None
+        
         start_time = time.time()
         try:
-            # Reset the connection
-            TM1ConnectionManager.reset_connection(instance_name)
-            
-            # Attempt to reconnect
-            tm1 = TM1ConnectionManager.get_connection(instance_name)
-            
+            server_name = await self.run_tm1_async(_reconnect_sync, instance_name)
             duration_ms = (time.time() - start_time) * 1000
             
-            if tm1:
-                server_name = tm1.server.get_server_name()
+            if server_name:
                 self.log_tm1_operation("reconnect", instance_name, True, duration_ms)
                 self.success(data={
                     "instance": instance_name,
@@ -478,14 +518,21 @@ class TM1CubesHandler(TM1BaseHandler):
         
         instance_name = self.get_instance_name()
         
+        def _get_cubes_sync(inst_name):
+            """Blocking TM1 operation."""
+            tm1 = TM1ConnectionManager.get_connection(inst_name)
+            if not tm1:
+                return None
+            return tm1.cubes.get_all_names()
+        
         start_time = time.time()
         try:
-            tm1 = TM1ConnectionManager.get_connection(instance_name)
-            if not tm1:
+            cubes = await self.run_tm1_async(_get_cubes_sync, instance_name)
+            
+            if cubes is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 return
             
-            cubes = tm1.cubes.get_all_names()
             duration_ms = (time.time() - start_time) * 1000
             
             self.log_tm1_operation("get_cubes", instance_name, True, duration_ms,
@@ -527,21 +574,28 @@ class TM1QueryHandler(TM1BaseHandler):
             self.error("MDX query is required", 400)
             return
         
-        start_time = time.time()
-        try:
-            tm1 = TM1ConnectionManager.get_connection(instance_name)
+        def _execute_mdx_sync(inst_name, mdx_query):
+            """Blocking TM1 operation."""
+            tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
-                self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
-                return
+                return None
             
-            cellset = tm1.cells.execute_mdx(mdx)
-            
+            cellset = tm1.cells.execute_mdx(mdx_query)
             result = []
             for cell in cellset:
                 result.append({
                     "coordinates": cell.get("Ordinal"),
                     "value": cell.get("Value")
                 })
+            return result
+        
+        start_time = time.time()
+        try:
+            result = await self.run_tm1_async(_execute_mdx_sync, instance_name, mdx)
+            
+            if result is None:
+                self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
+                return
             
             duration_ms = (time.time() - start_time) * 1000
             self.log_tm1_operation("execute_mdx", instance_name, True, duration_ms,

@@ -19,10 +19,16 @@ import json
 import logging
 from typing import Dict, Any, Optional, List
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 import tornado.web
+import tornado.ioloop
 
 logger = logging.getLogger("tm1query")
+
+# Thread pool for async TM1 operations (TM1py is blocking)
+TM1_EXECUTOR = ThreadPoolExecutor(max_workers=16)
 
 # TM1py import
 try:
@@ -77,6 +83,16 @@ class TM1QueryBaseHandler(tornado.web.RequestHandler):
         """Send error response."""
         self.set_status(status_code)
         self.write({"success": False, "error": message})
+    
+    async def run_tm1_async(self, func, *args, **kwargs):
+        """
+        Run a blocking TM1 operation asynchronously in a thread pool.
+        
+        Usage:
+            result = await self.run_tm1_async(some_blocking_func, arg1, arg2)
+        """
+        loop = tornado.ioloop.IOLoop.current()
+        return await loop.run_in_executor(TM1_EXECUTOR, partial(func, *args, **kwargs))
     
     def _resolve_env(self, value: Any) -> Any:
         """Resolve environment variables in config values."""
@@ -203,14 +219,18 @@ class TM1ConnectHandler(TM1QueryBaseHandler):
                 return
             params = self._build_connection_params(self.tm1_instances[instance_name])
         
+        def _connect_sync(tm1_params):
+            """Blocking TM1 connection test."""
+            with TM1Service(**tm1_params) as tm1:
+                return tm1.server.get_server_name()
+        
         try:
-            with TM1Service(**params) as tm1:
-                server_name = tm1.server.get_server_name()
-                self.success(data={
-                    "connected": True,
-                    "server_name": server_name,
-                    "instance": instance_name
-                }, message=f"Connected to {server_name}")
+            server_name = await self.run_tm1_async(_connect_sync, params)
+            self.success(data={
+                "connected": True,
+                "server_name": server_name,
+                "instance": instance_name
+            }, message=f"Connected to {server_name}")
         except Exception as e:
             self.error(f"Connection failed: {str(e)}", 400)
 
@@ -248,20 +268,18 @@ class TM1MDXHandler(TM1QueryBaseHandler):
                 return
             params = self._build_connection_params(self.tm1_instances[instance_name])
         
-        try:
-            with TM1Service(**params) as tm1:
-                # Execute MDX
-                cellset = tm1.cubes.cells.execute_mdx(mdx)
+        def _execute_mdx_sync(tm1_params, mdx_query, limit):
+            """Blocking MDX execution."""
+            with TM1Service(**tm1_params) as tm1:
+                cellset = tm1.cubes.cells.execute_mdx(mdx_query)
                 
-                # Convert to list of dicts for JSON
                 rows = []
                 row_count = 0
                 
                 for cell_key, cell_value in cellset.items():
-                    if row_count >= max_rows:
+                    if row_count >= limit:
                         break
                     
-                    # cell_key is a tuple of element names
                     row = {
                         "coordinates": list(cell_key) if isinstance(cell_key, tuple) else [cell_key],
                         "value": cell_value
@@ -269,12 +287,17 @@ class TM1MDXHandler(TM1QueryBaseHandler):
                     rows.append(row)
                     row_count += 1
                 
-                self.success(data={
-                    "rows": rows,
-                    "row_count": len(rows),
-                    "truncated": row_count >= max_rows,
-                    "max_rows": max_rows
-                }, message=f"Query returned {len(rows)} rows")
+                return rows, row_count >= limit
+        
+        try:
+            rows, truncated = await self.run_tm1_async(_execute_mdx_sync, params, mdx, max_rows)
+            
+            self.success(data={
+                "rows": rows,
+                "row_count": len(rows),
+                "truncated": truncated,
+                "max_rows": max_rows
+            }, message=f"Query returned {len(rows)} rows")
                 
         except TM1pyException as e:
             self.error(f"TM1 Error: {str(e)}", 400)
@@ -300,10 +323,14 @@ class TM1CubesHandler(TM1QueryBaseHandler):
         
         params = self._build_connection_params(self.tm1_instances[instance_name])
         
+        def _get_cubes_sync(tm1_params):
+            """Blocking cube list operation."""
+            with TM1Service(**tm1_params) as tm1:
+                return tm1.cubes.get_all_names()
+        
         try:
-            with TM1Service(**params) as tm1:
-                cubes = tm1.cubes.get_all_names()
-                self.success(data={"cubes": cubes, "count": len(cubes)})
+            cubes = await self.run_tm1_async(_get_cubes_sync, params)
+            self.success(data={"cubes": cubes, "count": len(cubes)})
         except Exception as e:
             self.error(f"Failed to get cubes: {str(e)}", 400)
 

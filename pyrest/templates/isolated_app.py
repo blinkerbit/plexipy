@@ -324,6 +324,7 @@ def main():
     app_path_str = os.environ.get("PYREST_APP_PATH")
     port_str = os.environ.get("PYREST_APP_PORT")
     base_path = os.environ.get("PYREST_BASE_PATH", "/pyrest")
+    num_processes = int(os.environ.get("PYREST_NUM_PROCESSES", "8"))
     
     if not app_name or not app_path_str or not port_str:
         logger.error("Missing required environment variables")
@@ -353,14 +354,19 @@ def main():
     # Create application
     app = create_application(app_path, base_path, app_name)
     
-    # Create server
+    # Create server with forking support
     server = tornado.httpserver.HTTPServer(app)
-    server.listen(port, "0.0.0.0")  # Listen on all interfaces (needed for Docker networking)
+    server.bind(port, "0.0.0.0")  # Bind on all interfaces (needed for Docker networking)
+    
+    # Fork multiple processes for handling requests
+    # Note: start() must be called before IOLoop.start()
+    server.start(num_processes)  # Fork 8 processes by default
     
     logger.info("=" * 50)
     logger.info(f"Isolated app '{app_name}' starting...")
     logger.info(f"Listening on http://0.0.0.0:{port}")
     logger.info(f"Base path: {base_path}/{app_name}")
+    logger.info(f"Worker processes: {num_processes}")
     logger.info("=" * 50)
     
     try:
