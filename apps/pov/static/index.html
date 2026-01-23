@@ -278,7 +278,9 @@
                     <option value="onprem">On-Premise (Basic/CAM)</option>
                     <option value="cloud">IBM Cloud (API Key)</option>
                     <option value="azure_ad">TM1 v12 Cloud (Azure AD)</option>
+                    <option value="token">Pre-acquired Token</option>
                 </select>
+                <a href="/pyrest/pov/token-ui" style="font-size: 0.75rem; margin-left: 0.5rem;">Manage Tokens</a>
             </div>
             
             <!-- On-Premise Fields -->
@@ -366,6 +368,28 @@
                     <p style="font-size: 0.75rem; color: var(--cyan); margin: 0;">
                         Uses OAuth2 Client Credentials flow to acquire access token from Azure AD, 
                         then connects to TM1 using the token.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Token Fields (Pre-acquired) -->
+            <div id="token-fields" style="display: none;">
+                <div class="form-group">
+                    <label>TM1 Server Base URL</label>
+                    <input type="text" id="token_base_url" placeholder="https://yourserver.planning-analytics.cloud.ibm.com/api/v0/tm1/...">
+                    <div class="hint">TM1 REST API base URL</div>
+                </div>
+                <div class="form-group">
+                    <label>Access Token</label>
+                    <textarea id="access_token" rows="4" placeholder="Paste your Azure AD access token here"></textarea>
+                    <div class="hint">
+                        <span id="token-status-hint"></span>
+                        <a href="/pyrest/pov/token-ui" style="margin-left: 0.5rem;">Get a token</a>
+                    </div>
+                </div>
+                <div style="background: var(--bg); padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem;">
+                    <p style="font-size: 0.75rem; color: var(--cyan); margin: 0;">
+                        Uses a pre-acquired access token. No token refresh is performed - get a new token when it expires.
                     </p>
                 </div>
             </div>
@@ -460,7 +484,7 @@
   "target_element": "2024,Total,Sales"
 }</pre>
             <p style="font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 0.5rem;">TM1 v12 Azure AD Example (OAuth2 Client Credentials):</p>
-            <pre style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright);">{
+            <pre style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright); margin-bottom: 1rem;">{
   "connection_type": "azure_ad",
   "base_url": "https://server.planning-analytics.cloud.ibm.com/api/v0/tm1/...",
   "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
@@ -472,8 +496,18 @@
   "element2": "2024,South,Sales",
   "target_element": "2024,Total,Sales"
 }</pre>
+            <p style="font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 0.5rem;">Pre-acquired Token Example:</p>
+            <pre style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright);">{
+  "connection_type": "token",
+  "base_url": "https://server.planning-analytics.cloud.ibm.com/api/v0/tm1/...",
+  "access_token": "eyJ0eXAiOiJKV1...",
+  "cube": "SalesCube",
+  "element1": "2024,North,Sales",
+  "element2": "2024,South,Sales",
+  "target_element": "2024,Total,Sales"
+}</pre>
             <p style="font-size: 0.7rem; color: var(--cyan); margin-top: 0.5rem;">
-                Note: Azure AD connection acquires an access token using MSAL OAuth2 client credentials flow, then uses the token to connect to TM1.
+                Tip: Use <code>POST /pyrest/pov/token</code> to acquire a token once, then reuse it with <code>connection_type: "token"</code>.
             </p>
         </div>
     </div>
@@ -495,6 +529,12 @@
             document.getElementById('onprem-fields').style.display = type === 'onprem' ? 'block' : 'none';
             document.getElementById('cloud-fields').style.display = type === 'cloud' ? 'block' : 'none';
             document.getElementById('azure-fields').style.display = type === 'azure_ad' ? 'block' : 'none';
+            document.getElementById('token-fields').style.display = type === 'token' ? 'block' : 'none';
+            
+            // If switching to token mode, try to load saved token
+            if (type === 'token') {
+                loadSavedToken();
+            }
         }
         
         function toggleAzureAuthFields() {
@@ -514,7 +554,11 @@
         function getConnectionParams() {
             var params = { connection_type: connectionType };
             
-            if (connectionType === 'azure_ad') {
+            if (connectionType === 'token') {
+                // Pre-acquired access token
+                params.base_url = document.getElementById('token_base_url').value;
+                params.access_token = document.getElementById('access_token').value;
+            } else if (connectionType === 'azure_ad') {
                 // TM1 v12 with Azure AD - OAuth2 Client Credentials Flow
                 params.base_url = document.getElementById('azure_base_url').value;
                 params.tenant_id = document.getElementById('tenant_id').value;
@@ -681,6 +725,48 @@
             }
             return String(value);
         }
+        
+        // Token management
+        var TOKEN_STORAGE_KEY = 'pov_azure_token';
+        
+        function loadSavedToken() {
+            var saved = localStorage.getItem(TOKEN_STORAGE_KEY);
+            if (saved) {
+                try {
+                    var data = JSON.parse(saved);
+                    var tokenField = document.getElementById('access_token');
+                    var statusHint = document.getElementById('token-status-hint');
+                    
+                    // Check if token is expired
+                    var acquiredDate = new Date(data.acquired_at);
+                    var expiresAt = new Date(acquiredDate.getTime() + (data.expires_in * 1000));
+                    var now = new Date();
+                    var isExpired = now > expiresAt;
+                    
+                    tokenField.value = data.token;
+                    
+                    if (isExpired) {
+                        statusHint.innerHTML = '<span style="color: var(--error);">Token expired - </span>';
+                    } else {
+                        var remaining = Math.floor((expiresAt - now) / 60000);
+                        statusHint.innerHTML = '<span style="color: var(--success);">Valid token (' + remaining + ' min remaining) - </span>';
+                    }
+                } catch (e) {
+                    console.error('Failed to load saved token:', e);
+                }
+            }
+        }
+        
+        // Check for use_token parameter on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('use_token') === '1') {
+                // Switch to token mode and load saved token
+                document.getElementById('connection-type').value = 'token';
+                setConnectionType('token');
+                showMessage('Token loaded from Token Manager', 'info');
+            }
+        });
     </script>
 </body>
 </html>

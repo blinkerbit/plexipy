@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure AD Token Manager - POV</title>
+    <style>
+        :root {
+            --bg: #002b36;
+            --bg-alt: #073642;
+            --fg: #93a1a1;
+            --fg-dim: #586e75;
+            --fg-bright: #eee8d5;
+            --accent: #268bd2;
+            --success: #859900;
+            --warning: #b58900;
+            --error: #dc322f;
+            --cyan: #2aa198;
+            --magenta: #d33682;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--bg-alt);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: normal;
+            color: var(--fg-bright);
+            letter-spacing: 0.05em;
+        }
+        h1 span { color: var(--magenta); }
+        h2 {
+            font-size: 0.85rem;
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--fg-dim);
+            margin-bottom: 1rem;
+        }
+        .btn {
+            background: var(--bg-alt);
+            color: var(--fg);
+            border: 1px solid var(--fg-dim);
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn:hover {
+            background: #0a4052;
+            color: var(--fg-bright);
+            border-color: var(--fg);
+        }
+        .btn.primary {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn.primary:hover {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        .btn.success {
+            border-color: var(--success);
+            color: var(--success);
+        }
+        .btn.success:hover {
+            background: var(--success);
+            color: var(--bg);
+        }
+        .btn.warning {
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+        .btn.warning:hover {
+            background: var(--warning);
+            color: var(--bg);
+        }
+        .btn.error {
+            border-color: var(--error);
+            color: var(--error);
+        }
+        .btn.error:hover {
+            background: var(--error);
+            color: var(--bg);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .panel {
+            background: var(--bg-alt);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--fg-dim);
+            margin-bottom: 0.5rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            color: var(--fg-bright);
+            padding: 0.5rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .hint {
+            font-size: 0.75rem;
+            color: var(--fg-dim);
+            margin-top: 0.25rem;
+        }
+        .status {
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+        .status.success {
+            background: rgba(133, 153, 0, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+        .status.error {
+            background: rgba(220, 50, 47, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        .status.info {
+            background: rgba(38, 139, 210, 0.1);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+        .status.warning {
+            background: rgba(181, 137, 0, 0.1);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--fg-dim);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+        }
+        .token-display {
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            padding: 1rem;
+            margin-top: 1rem;
+            word-break: break-all;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .token-display.valid {
+            border-color: var(--success);
+        }
+        .token-display.expired {
+            border-color: var(--error);
+        }
+        .token-info {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+        .token-info dt {
+            color: var(--fg-dim);
+        }
+        .token-info dd {
+            color: var(--fg-bright);
+        }
+        .section-divider {
+            border-top: 1px solid var(--bg);
+            margin: 1.5rem 0;
+        }
+        .copy-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        .saved-configs {
+            margin-top: 1rem;
+        }
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg);
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid var(--fg-dim);
+        }
+        .config-item:hover {
+            border-color: var(--accent);
+        }
+        .config-name {
+            color: var(--fg-bright);
+            cursor: pointer;
+        }
+        .config-name:hover {
+            color: var(--accent);
+        }
+        .config-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .small-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+        }
+        .empty-state {
+            color: var(--fg-dim);
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Azure AD <span>Token Manager</span></h1>
+            <div class="nav-links">
+                <a href="/pyrest/pov/ui">POV App</a>
+                <a href="/pyrest">PyRest Home</a>
+            </div>
+        </header>
+        
+        <div id="message-area"></div>
+        
+        <!-- Saved Configurations -->
+        <div class="panel">
+            <h2>Saved Configurations</h2>
+            <div id="saved-configs" class="saved-configs">
+                <p class="empty-state">No saved configurations</p>
+            </div>
+            <div class="actions">
+                <button class="btn" onclick="clearAllConfigs()">Clear All</button>
+            </div>
+        </div>
+        
+        <!-- Azure AD Configuration -->
+        <div class="panel">
+            <h2>Azure AD App Registration</h2>
+            
+            <div class="form-group">
+                <label>Configuration Name</label>
+                <input type="text" id="config-name" placeholder="My TM1 Cloud Instance">
+                <div class="hint">A friendly name to identify this configuration</div>
+            </div>
+            
+            <div class="section-divider"></div>
+            
+            <div class="form-group">
+                <label>Tenant ID</label>
+                <input type="text" id="tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                <div class="hint">Azure AD directory (tenant) ID</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Client ID (Application ID)</label>
+                <input type="text" id="client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                <div class="hint">App registration Application (client) ID</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Client Secret</label>
+                <input type="password" id="client-secret" placeholder="Client secret value">
+                <div class="hint">Secret value from Certificates & Secrets</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Scope (Optional)</label>
+                <input type="text" id="scope" placeholder="Leave empty for default ({client_id}/.default)">
+                <div class="hint">OAuth2 scope for the token request</div>
+            </div>
+            
+            <div class="actions">
+                <button class="btn primary" onclick="acquireToken()">Get Access Token</button>
+                <button class="btn success" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+        
+        <!-- Token Display -->
+        <div class="panel" id="token-panel" style="display: none;">
+            <h2>Access Token</h2>
+            
+            <div class="token-info" id="token-info">
+                <dt>Status:</dt>
+                <dd id="token-status">-</dd>
+                <dt>Acquired:</dt>
+                <dd id="token-acquired">-</dd>
+                <dt>Expires In:</dt>
+                <dd id="token-expires">-</dd>
+            </div>
+            
+            <div class="actions" style="margin-top: 0; margin-bottom: 1rem;">
+                <button class="btn" onclick="copyToken()">Copy Token</button>
+                <button class="btn warning" onclick="clearToken()">Clear Token</button>
+                <button class="btn success" onclick="useInPOV()">Use in POV App</button>
+            </div>
+            
+            <label>Token Value <span id="token-length"></span></label>
+            <div class="token-display" id="token-value">-</div>
+        </div>
+        
+        <!-- Usage Instructions -->
+        <div class="panel">
+            <h2>How to Use</h2>
+            <ol style="padding-left: 1.5rem; font-size: 0.85rem; color: var(--fg);">
+                <li style="margin-bottom: 0.5rem;">Enter your Azure AD App Registration details above</li>
+                <li style="margin-bottom: 0.5rem;">Click "Get Access Token" to acquire a token</li>
+                <li style="margin-bottom: 0.5rem;">The token will be stored in your browser and can be reused</li>
+                <li style="margin-bottom: 0.5rem;">Click "Use in POV App" to go to the POV app with the token pre-filled</li>
+                <li style="margin-bottom: 0.5rem;">Save configurations for quick access later (secrets are stored locally)</li>
+            </ol>
+            
+            <div class="section-divider"></div>
+            
+            <p style="font-size: 0.8rem; color: var(--fg-dim);">
+                <strong>Note:</strong> Access tokens typically expire after 1 hour. 
+                The token is stored in your browser's localStorage and persists across sessions.
+                Your credentials are only sent to the backend for token acquisition.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'pov_azure_token';
+        const CONFIGS_KEY = 'pov_azure_configs';
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSavedToken();
+            loadSavedConfigs();
+        });
+        
+        function showMessage(msg, type = 'info') {
+            const area = document.getElementById('message-area');
+            area.innerHTML = `<div class="status ${type}">${msg}</div>`;
+            setTimeout(() => area.innerHTML = '', 5000);
+        }
+        
+        function loadSavedToken() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    displayToken(data);
+                } catch (e) {
+                    console.error('Failed to load saved token:', e);
+                }
+            }
+        }
+        
+        function loadSavedConfigs() {
+            const saved = localStorage.getItem(CONFIGS_KEY);
+            const container = document.getElementById('saved-configs');
+            
+            if (saved) {
+                try {
+                    const configs = JSON.parse(saved);
+                    if (configs.length === 0) {
+                        container.innerHTML = '<p class="empty-state">No saved configurations</p>';
+                        return;
+                    }
+                    
+                    container.innerHTML = configs.map((config, index) => `
+                        <div class="config-item">
+                            <span class="config-name" onclick="loadConfig(${index})">${config.name || 'Unnamed'}</span>
+                            <div class="config-actions">
+                                <button class="btn small-btn" onclick="loadConfig(${index})">Load</button>
+                                <button class="btn small-btn error" onclick="deleteConfig(${index})">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    container.innerHTML = '<p class="empty-state">No saved configurations</p>';
+                }
+            } else {
+                container.innerHTML = '<p class="empty-state">No saved configurations</p>';
+            }
+        }
+        
+        function saveConfig() {
+            const name = document.getElementById('config-name').value.trim();
+            const tenantId = document.getElementById('tenant-id').value.trim();
+            const clientId = document.getElementById('client-id').value.trim();
+            const clientSecret = document.getElementById('client-secret').value.trim();
+            const scope = document.getElementById('scope').value.trim();
+            
+            if (!name) {
+                showMessage('Please enter a configuration name', 'error');
+                return;
+            }
+            if (!tenantId || !clientId || !clientSecret) {
+                showMessage('Please fill in Tenant ID, Client ID, and Client Secret', 'error');
+                return;
+            }
+            
+            const config = { name, tenantId, clientId, clientSecret, scope };
+            
+            let configs = [];
+            const saved = localStorage.getItem(CONFIGS_KEY);
+            if (saved) {
+                try {
+                    configs = JSON.parse(saved);
+                } catch (e) {}
+            }
+            
+            // Check for duplicate name
+            const existingIndex = configs.findIndex(c => c.name === name);
+            if (existingIndex >= 0) {
+                configs[existingIndex] = config;
+                showMessage(`Configuration "${name}" updated`, 'success');
+            } else {
+                configs.push(config);
+                showMessage(`Configuration "${name}" saved`, 'success');
+            }
+            
+            localStorage.setItem(CONFIGS_KEY, JSON.stringify(configs));
+            loadSavedConfigs();
+        }
+        
+        function loadConfig(index) {
+            const saved = localStorage.getItem(CONFIGS_KEY);
+            if (saved) {
+                try {
+                    const configs = JSON.parse(saved);
+                    const config = configs[index];
+                    if (config) {
+                        document.getElementById('config-name').value = config.name || '';
+                        document.getElementById('tenant-id').value = config.tenantId || '';
+                        document.getElementById('client-id').value = config.clientId || '';
+                        document.getElementById('client-secret').value = config.clientSecret || '';
+                        document.getElementById('scope').value = config.scope || '';
+                        showMessage(`Loaded configuration: ${config.name}`, 'info');
+                    }
+                } catch (e) {
+                    showMessage('Failed to load configuration', 'error');
+                }
+            }
+        }
+        
+        function deleteConfig(index) {
+            const saved = localStorage.getItem(CONFIGS_KEY);
+            if (saved) {
+                try {
+                    const configs = JSON.parse(saved);
+                    const name = configs[index]?.name || 'Configuration';
+                    configs.splice(index, 1);
+                    localStorage.setItem(CONFIGS_KEY, JSON.stringify(configs));
+                    loadSavedConfigs();
+                    showMessage(`Deleted: ${name}`, 'info');
+                } catch (e) {
+                    showMessage('Failed to delete configuration', 'error');
+                }
+            }
+        }
+        
+        function clearAllConfigs() {
+            if (confirm('Delete all saved configurations?')) {
+                localStorage.removeItem(CONFIGS_KEY);
+                loadSavedConfigs();
+                showMessage('All configurations cleared', 'info');
+            }
+        }
+        
+        async function acquireToken() {
+            const tenantId = document.getElementById('tenant-id').value.trim();
+            const clientId = document.getElementById('client-id').value.trim();
+            const clientSecret = document.getElementById('client-secret').value.trim();
+            const scope = document.getElementById('scope').value.trim();
+            
+            if (!tenantId || !clientId || !clientSecret) {
+                showMessage('Please fill in Tenant ID, Client ID, and Client Secret', 'error');
+                return;
+            }
+            
+            showMessage('<span class="spinner"></span> Acquiring token from Azure AD...', 'info');
+            
+            try {
+                const response = await fetch('/pyrest/pov/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tenant_id: tenantId,
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        scope: scope || undefined
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const tokenData = {
+                        token: result.data.access_token,
+                        acquired_at: new Date().toISOString(),
+                        expires_in: result.data.expires_in || 3600,
+                        tenant_id: tenantId,
+                        client_id: clientId
+                    };
+                    
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(tokenData));
+                    displayToken(tokenData);
+                    showMessage('Token acquired successfully!', 'success');
+                } else {
+                    showMessage(`Failed: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showMessage(`Error: ${e.message}`, 'error');
+            }
+        }
+        
+        function displayToken(data) {
+            const panel = document.getElementById('token-panel');
+            panel.style.display = 'block';
+            
+            const acquiredDate = new Date(data.acquired_at);
+            const expiresAt = new Date(acquiredDate.getTime() + (data.expires_in * 1000));
+            const now = new Date();
+            const isExpired = now > expiresAt;
+            const remainingMs = expiresAt - now;
+            
+            // Status
+            const statusEl = document.getElementById('token-status');
+            if (isExpired) {
+                statusEl.innerHTML = '<span style="color: var(--error);">EXPIRED</span>';
+            } else {
+                statusEl.innerHTML = '<span style="color: var(--success);">VALID</span>';
+            }
+            
+            // Acquired time
+            document.getElementById('token-acquired').textContent = acquiredDate.toLocaleString();
+            
+            // Expires in
+            if (isExpired) {
+                document.getElementById('token-expires').innerHTML = 
+                    '<span style="color: var(--error);">Expired ' + formatDuration(Math.abs(remainingMs)) + ' ago</span>';
+            } else {
+                document.getElementById('token-expires').textContent = formatDuration(remainingMs);
+            }
+            
+            // Token value
+            const tokenDisplay = document.getElementById('token-value');
+            tokenDisplay.textContent = data.token;
+            tokenDisplay.className = 'token-display ' + (isExpired ? 'expired' : 'valid');
+            
+            // Token length
+            document.getElementById('token-length').textContent = `(${data.token.length} chars)`;
+        }
+        
+        function formatDuration(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes % 60}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${seconds % 60}s`;
+            } else {
+                return `${seconds}s`;
+            }
+        }
+        
+        function copyToken() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    navigator.clipboard.writeText(data.token);
+                    showMessage('Token copied to clipboard!', 'success');
+                } catch (e) {
+                    showMessage('Failed to copy token', 'error');
+                }
+            }
+        }
+        
+        function clearToken() {
+            localStorage.removeItem(STORAGE_KEY);
+            document.getElementById('token-panel').style.display = 'none';
+            showMessage('Token cleared', 'info');
+        }
+        
+        function useInPOV() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                // Token is already in localStorage, POV app will read it
+                // Redirect to POV app with a flag to use token mode
+                window.location.href = '/pyrest/pov/ui?use_token=1';
+            } else {
+                showMessage('No token available. Please acquire a token first.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

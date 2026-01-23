@@ -217,6 +217,8 @@ class POVInfoHandler(POVBaseHandler):
             "msal_available": MSAL_AVAILABLE,
             "endpoints": {
                 "GET /ui": "Web interface",
+                "GET /token-ui": "Azure AD Token Manager UI",
+                "POST /token": "Acquire Azure AD access token",
                 "POST /connect": "Test TM1 connection",
                 "POST /fetch": "Fetch values from two elements",
                 "POST /update": "Update element with value",
@@ -238,6 +240,11 @@ class POVInfoHandler(POVBaseHandler):
                     "fields": ["base_url", "tenant_id", "client_id", "client_secret"],
                     "optional_fields": ["scope"],
                     "note": "Access token is acquired automatically using client_id, client_secret, and tenant_id"
+                },
+                "token": {
+                    "description": "Use pre-acquired access token",
+                    "fields": ["base_url", "access_token"],
+                    "note": "Use POST /token to acquire a token, then reuse it for multiple requests"
                 }
             }
         })
