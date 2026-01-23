@@ -119,7 +119,23 @@ class POVBaseHandler(tornado.web.RequestHandler):
         """Build TM1Service parameters from request body."""
         connection_type = body.get('connection_type', 'onprem')
         
-        if connection_type == 'azure_ad':
+        if connection_type == 'token':
+            # Use pre-acquired access token directly
+            base_url = body.get('base_url', '')
+            access_token = body.get('access_token', '')
+            
+            if not base_url:
+                raise ValueError("Token connection requires: base_url")
+            if not access_token:
+                raise ValueError("Token connection requires: access_token")
+            
+            return {
+                'base_url': base_url,
+                'access_token': access_token,
+                'ssl': True
+            }
+        
+        elif connection_type == 'azure_ad':
             # TM1 v12 Cloud with Azure AD authentication
             base_url = body.get('base_url', '')
             tenant_id = body.get('tenant_id', '')
@@ -245,6 +261,101 @@ class POVUIHandler(tornado.web.RequestHandler):
         except FileNotFoundError:
             self.set_status(404)
             self.write({'error': 'UI not found', 'path': html_path})
+
+
+class POVTokenUIHandler(tornado.web.RequestHandler):
+    """Serve the Token Manager UI."""
+    
+    def initialize(self, app_config=None, **kwargs):
+        self.app_config = app_config or {}
+    
+    async def get(self):
+        import os
+        app_path = os.environ.get('PYREST_APP_PATH', os.path.dirname(__file__))
+        html_path = os.path.join(app_path, 'static', 'token.html')
+        
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                self.set_header('Content-Type', 'text/html')
+                self.write(f.read())
+        except FileNotFoundError:
+            self.set_status(404)
+            self.write({'error': 'Token UI not found', 'path': html_path})
+
+
+class POVTokenHandler(POVBaseHandler):
+    """Acquire Azure AD access token."""
+    
+    async def post(self):
+        """
+        Acquire an access token from Azure AD using client credentials flow.
+        
+        Request body:
+        {
+            "tenant_id": "xxx-xxx-xxx",
+            "client_id": "xxx-xxx-xxx",
+            "client_secret": "secret",
+            "scope": "optional scope"
+        }
+        
+        Returns:
+        {
+            "success": true,
+            "data": {
+                "access_token": "eyJ...",
+                "expires_in": 3600
+            }
+        }
+        """
+        if not MSAL_AVAILABLE:
+            return self.error("MSAL library not available. Install with: pip install msal", 500)
+        
+        body = self.get_json_body()
+        
+        tenant_id = body.get('tenant_id', '').strip()
+        client_id = body.get('client_id', '').strip()
+        client_secret = body.get('client_secret', '').strip()
+        scope = body.get('scope', '').strip()
+        
+        if not tenant_id:
+            return self.error("tenant_id is required")
+        if not client_id:
+            return self.error("client_id is required")
+        if not client_secret:
+            return self.error("client_secret is required")
+        
+        def _acquire_token_sync():
+            """Blocking token acquisition."""
+            # Default scope for TM1/Planning Analytics
+            token_scope = scope if scope else f"{client_id}/.default"
+            
+            # Create MSAL confidential client
+            authority = f"https://login.microsoftonline.com/{tenant_id}"
+            
+            app = ConfidentialClientApplication(
+                client_id,
+                authority=authority,
+                client_credential=client_secret
+            )
+            
+            # Acquire token using client credentials
+            result = app.acquire_token_for_client(scopes=[token_scope])
+            
+            if "access_token" in result:
+                return {
+                    "access_token": result["access_token"],
+                    "expires_in": result.get("expires_in", 3600)
+                }
+            else:
+                error = result.get("error", "Unknown error")
+                error_desc = result.get("error_description", "No description")
+                raise Exception(f"{error}: {error_desc}")
+        
+        try:
+            token_data = await self.run_tm1_async(_acquire_token_sync)
+            self.success(data=token_data, message="Token acquired successfully")
+        except Exception as e:
+            self.error(f"Token acquisition failed: {str(e)}")
 
 
 class POVConnectHandler(POVBaseHandler):
@@ -515,6 +626,8 @@ def get_handlers():
     return [
         (r"/", POVInfoHandler),
         (r"/ui", POVUIHandler),
+        (r"/token-ui", POVTokenUIHandler),
+        (r"/token", POVTokenHandler),
         (r"/connect", POVConnectHandler),
         (r"/fetch", POVFetchHandler),
         (r"/update", POVUpdateHandler),
