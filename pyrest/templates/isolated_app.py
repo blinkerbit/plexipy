@@ -74,6 +74,43 @@ class IsolatedBaseHandler(tornado.web.RequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             return {}
     
+    def load_args(self) -> Dict[str, Any]:
+        """
+        Load all request arguments into a unified dictionary.
+        
+        Returns a dict with:
+            - args['path']  - URL path parameters (e.g., /instance/{name} -> args['path']['name'])
+            - args['query'] - URL query parameters (e.g., ?limit=10 -> args['query']['limit'])
+            - args['body']  - JSON request body as dict
+        
+        Example usage in handler:
+            args = self.load_args()
+            instance_name = args['path'].get('instance_name')
+            limit = args['query'].get('limit', '100')
+            data = args['body']
+        """
+        # Path parameters (from URL pattern captures)
+        path_args = dict(self.path_kwargs) if hasattr(self, 'path_kwargs') else {}
+        
+        # Query parameters (flatten single-value lists)
+        query_args = {}
+        for key, values in self.request.arguments.items():
+            if len(values) == 1:
+                # Single value - decode and return as string
+                query_args[key] = values[0].decode('utf-8') if isinstance(values[0], bytes) else values[0]
+            else:
+                # Multiple values - return as list of strings
+                query_args[key] = [v.decode('utf-8') if isinstance(v, bytes) else v for v in values]
+        
+        # Body (JSON parsed)
+        body = self.get_json_body()
+        
+        return {
+            'path': path_args,
+            'query': query_args,
+            'body': body
+        }
+    
     def success(self, data: Any = None, message: str = "Success", status_code: int = 200):
         """Send a success response."""
         self.set_status(status_code)
@@ -263,6 +300,12 @@ def create_application(app_path: Path, base_path: str, app_name: str) -> tornado
             
             handlers.append((full_path, handler_class, init_kwargs))
             logger.info(f"Registered handler: {full_path}")
+            
+            # Also register without trailing slash for paths ending with /
+            if full_path.endswith("/") and len(full_path) > 1:
+                no_slash_path = full_path.rstrip("/")
+                handlers.append((no_slash_path, handler_class, init_kwargs))
+                logger.info(f"Registered handler: {no_slash_path} (no trailing slash)")
     
     # Application settings
     settings = {
@@ -312,11 +355,11 @@ def main():
     
     # Create server
     server = tornado.httpserver.HTTPServer(app)
-    server.listen(port, "127.0.0.1")  # Only listen on localhost
+    server.listen(port, "0.0.0.0")  # Listen on all interfaces (needed for Docker networking)
     
     logger.info("=" * 50)
     logger.info(f"Isolated app '{app_name}' starting...")
-    logger.info(f"Listening on http://127.0.0.1:{port}")
+    logger.info(f"Listening on http://0.0.0.0:{port}")
     logger.info(f"Base path: {base_path}/{app_name}")
     logger.info("=" * 50)
     

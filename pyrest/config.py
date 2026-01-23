@@ -454,7 +454,8 @@ class FrameworkConfig:
     
     @property
     def apps_folder(self) -> str:
-        return self._config["apps_folder"]
+        # Allow override via environment variable
+        return os.environ.get("PYREST_APPS_FOLDER", self._config["apps_folder"])
     
     @property
     def jwt_secret(self) -> str:

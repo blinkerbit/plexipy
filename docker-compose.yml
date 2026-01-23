@@ -24,9 +24,13 @@ services:
       - PYREST_HOST=0.0.0.0
       - PYREST_PORT=8000
       - PYREST_DEBUG=false
+      # Apps folder can be configured via environment variable (defaults to "apps" from config.json)
+      # Set PYREST_APPS_FOLDER to use a different path (e.g., /custom/path/to/apps)
     volumes:
-      # Mount apps folder for development (comment out in production)
-      - ./apps:/app/apps:ro
+      # Mount apps folder (path configurable via PYREST_APPS_FOLDER env var or config.json)
+      # Default: ./apps -> /app/apps (if WORKDIR is /app)
+      # To use a different path, set PYREST_APPS_FOLDER env var and update this mount accordingly
+      - ./apps:/app/apps
       # Mount config files
       - ./config.json:/app/config.json:ro
       - ./auth_config.json:/app/auth_config.json:ro

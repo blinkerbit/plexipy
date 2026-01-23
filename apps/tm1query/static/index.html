@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TM1 MDX Query Tool</title>
+    <style>
+        :root {
+            --bg: #002b36;
+            --bg-alt: #073642;
+            --fg: #93a1a1;
+            --fg-dim: #586e75;
+            --fg-bright: #eee8d5;
+            --accent: #268bd2;
+            --success: #859900;
+            --warning: #b58900;
+            --error: #dc322f;
+            --cyan: #2aa198;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--bg-alt);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: normal;
+            color: var(--fg-bright);
+            letter-spacing: 0.05em;
+        }
+        h1 span { color: var(--fg-dim); }
+        h2 {
+            font-size: 0.85rem;
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--fg-dim);
+            margin-bottom: 1rem;
+        }
+        .btn {
+            background: var(--bg-alt);
+            color: var(--fg);
+            border: 1px solid var(--fg-dim);
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn:hover {
+            background: #0a4052;
+            color: var(--fg-bright);
+            border-color: var(--fg);
+        }
+        .btn.primary {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn.primary:hover {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+        }
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .panel {
+            background: var(--bg-alt);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--fg-dim);
+            margin-bottom: 0.5rem;
+        }
+        input, select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            color: var(--fg-bright);
+            padding: 0.5rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .checkbox-group input {
+            width: auto;
+        }
+        .checkbox-group label {
+            margin: 0;
+            text-transform: none;
+            font-size: 0.9rem;
+            color: var(--fg);
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            color: var(--fg-bright);
+            padding: 1rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        .status {
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+        .status.success {
+            background: rgba(133, 153, 0, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+        .status.error {
+            background: rgba(220, 50, 47, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        .status.info {
+            background: rgba(38, 139, 210, 0.1);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+        .results-container {
+            background: var(--bg-alt);
+            padding: 1rem;
+            max-height: 500px;
+            overflow: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th {
+            text-align: left;
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--fg-dim);
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--fg-dim);
+            position: sticky;
+            top: 0;
+            background: var(--bg-alt);
+        }
+        td {
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+        .value-cell {
+            color: var(--cyan);
+            text-align: right;
+        }
+        .empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--fg-dim);
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--fg-dim);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+            opacity: 0;
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .row-count {
+            font-size: 0.8rem;
+            color: var(--fg-dim);
+            margin-bottom: 0.5rem;
+        }
+        .truncated-warning {
+            color: var(--warning);
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .nav-link {
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="fade-in">
+            <h1>TM1 <span>MDX Query</span></h1>
+            <a href="/pyrest" class="btn nav-link">Back to PyRest</a>
+        </header>
+
+        <div class="grid fade-in">
+            <div class="sidebar">
+                <div class="panel">
+                    <h2>Connection Settings</h2>
+                    
+                    <div class="form-group">
+                        <label>Instance</label>
+                        <select id="instance-select">
+                            <option value="default">default</option>
+                        </select>
+                    </div>
+                    
+                    <div class="checkbox-group" style="margin-bottom: 1rem;">
+                        <input type="checkbox" id="custom-connection">
+                        <label for="custom-connection">Use custom connection</label>
+                    </div>
+                    
+                    <div id="custom-fields" style="display: none;">
+                        <div class="form-group">
+                            <label>Server</label>
+                            <input type="text" id="server" placeholder="localhost">
+                        </div>
+                        <div class="form-group">
+                            <label>Port</label>
+                            <input type="number" id="port" value="8010">
+                        </div>
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="username" placeholder="admin">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="password">
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="ssl" checked>
+                            <label for="ssl">Use SSL</label>
+                        </div>
+                    </div>
+                    
+                    <div class="actions">
+                        <button class="btn" onclick="testConnection()">Test Connection</button>
+                        <button class="btn" onclick="loadCubes()">Load Cubes</button>
+                    </div>
+                    
+                    <div id="connection-status" style="margin-top: 1rem;"></div>
+                </div>
+                
+                <div class="panel" id="cubes-panel" style="display: none;">
+                    <h2>Available Cubes</h2>
+                    <div id="cubes-list"></div>
+                </div>
+            </div>
+            
+            <div class="main">
+                <div class="panel">
+                    <h2>MDX Query</h2>
+                    <textarea id="mdx-input" placeholder="SELECT
+  {[Measures].[Amount]} ON COLUMNS,
+  {TM1SubsetAll([Product])} ON ROWS
+FROM [SalesCube]"></textarea>
+                    
+                    <div class="actions">
+                        <button class="btn primary" onclick="runQuery()">Run Query</button>
+                        <button class="btn" onclick="clearResults()">Clear</button>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <h2>Results</h2>
+                    <div id="query-status"></div>
+                    <div id="row-count" class="row-count"></div>
+                    <div class="results-container" id="results-container">
+                        <div class="empty">Run a query to see results</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var API_BASE = window.location.pathname.replace(/\/$/, '');
+        
+        // Toggle custom connection fields
+        document.getElementById('custom-connection').addEventListener('change', function() {
+            document.getElementById('custom-fields').style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Load instances on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadInstances();
+        });
+        
+        function loadInstances() {
+            fetch(API_BASE + '/instances')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && data.data.instances) {
+                        var select = document.getElementById('instance-select');
+                        select.innerHTML = '';
+                        data.data.instances.forEach(function(inst) {
+                            var opt = document.createElement('option');
+                            opt.value = inst.name;
+                            opt.textContent = inst.name + ' (' + inst.connection_type + ')';
+                            select.appendChild(opt);
+                        });
+                    }
+                })
+                .catch(function(e) {
+                    showStatus('connection-status', 'Failed to load instances: ' + e.message, 'error');
+                });
+        }
+        
+        function getConnectionParams() {
+            var isCustom = document.getElementById('custom-connection').checked;
+            var params = {
+                instance: document.getElementById('instance-select').value
+            };
+            
+            if (isCustom) {
+                params.custom = true;
+                params.server = document.getElementById('server').value || 'localhost';
+                params.port = parseInt(document.getElementById('port').value) || 8010;
+                params.user = document.getElementById('username').value;
+                params.password = document.getElementById('password').value;
+                params.ssl = document.getElementById('ssl').checked;
+            }
+            
+            return params;
+        }
+        
+        function showStatus(elementId, message, type) {
+            var el = document.getElementById(elementId);
+            el.innerHTML = '<div class="status ' + type + '">' + message + '</div>';
+        }
+        
+        function testConnection() {
+            showStatus('connection-status', '<span class="spinner"></span> Connecting...', 'info');
+            
+            fetch(API_BASE + '/connect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(getConnectionParams())
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showStatus('connection-status', 'Connected to ' + data.data.server_name, 'success');
+                } else {
+                    showStatus('connection-status', data.error, 'error');
+                }
+            })
+            .catch(function(e) {
+                showStatus('connection-status', 'Connection failed: ' + e.message, 'error');
+            });
+        }
+        
+        function loadCubes() {
+            var params = getConnectionParams();
+            var url = API_BASE + '/cubes?instance=' + encodeURIComponent(params.instance);
+            
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var panel = document.getElementById('cubes-panel');
+                        var list = document.getElementById('cubes-list');
+                        panel.style.display = 'block';
+                        
+                        if (data.data.cubes.length === 0) {
+                            list.innerHTML = '<div class="empty">No cubes found</div>';
+                        } else {
+                            list.innerHTML = data.data.cubes.map(function(cube) {
+                                return '<div style="padding: 0.25rem 0; cursor: pointer; color: var(--accent);" onclick="insertCube(\'' + cube + '\')">' + cube + '</div>';
+                            }).join('');
+                        }
+                    } else {
+                        showStatus('connection-status', data.error, 'error');
+                    }
+                })
+                .catch(function(e) {
+                    showStatus('connection-status', 'Failed to load cubes: ' + e.message, 'error');
+                });
+        }
+        
+        function insertCube(cubeName) {
+            var textarea = document.getElementById('mdx-input');
+            textarea.value = 'SELECT\n  {} ON COLUMNS,\n  {} ON ROWS\nFROM [' + cubeName + ']';
+            textarea.focus();
+        }
+        
+        function runQuery() {
+            var mdx = document.getElementById('mdx-input').value.trim();
+            if (!mdx) {
+                showStatus('query-status', 'Please enter an MDX query', 'error');
+                return;
+            }
+            
+            showStatus('query-status', '<span class="spinner"></span> Executing query...', 'info');
+            document.getElementById('row-count').textContent = '';
+            document.getElementById('results-container').innerHTML = '<div class="empty"><span class="spinner"></span> Loading...</div>';
+            
+            var params = getConnectionParams();
+            params.mdx = mdx;
+            
+            fetch(API_BASE + '/mdx', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(params)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showStatus('query-status', data.message, 'success');
+                    renderResults(data.data);
+                } else {
+                    showStatus('query-status', data.error, 'error');
+                    document.getElementById('results-container').innerHTML = '<div class="empty">Query failed</div>';
+                }
+            })
+            .catch(function(e) {
+                showStatus('query-status', 'Query failed: ' + e.message, 'error');
+                document.getElementById('results-container').innerHTML = '<div class="empty">Query failed</div>';
+            });
+        }
+        
+        function renderResults(data) {
+            var container = document.getElementById('results-container');
+            var rowCountEl = document.getElementById('row-count');
+            
+            if (!data.rows || data.rows.length === 0) {
+                container.innerHTML = '<div class="empty">No results</div>';
+                rowCountEl.textContent = '0 rows';
+                return;
+            }
+            
+            // Row count with truncation warning
+            var countText = data.row_count + ' rows';
+            if (data.truncated) {
+                countText += ' <span class="truncated-warning">(truncated at ' + data.max_rows + ')</span>';
+            }
+            rowCountEl.innerHTML = countText;
+            
+            // Determine columns from first row
+            var firstRow = data.rows[0];
+            var numCoords = firstRow.coordinates.length;
+            
+            // Build table
+            var html = '<table><thead><tr>';
+            for (var i = 0; i < numCoords; i++) {
+                html += '<th>Dim ' + (i + 1) + '</th>';
+            }
+            html += '<th>Value</th></tr></thead><tbody>';
+            
+            data.rows.forEach(function(row) {
+                html += '<tr>';
+                row.coordinates.forEach(function(coord) {
+                    html += '<td>' + escapeHtml(String(coord)) + '</td>';
+                });
+                html += '<td class="value-cell">' + formatValue(row.value) + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        
+        function formatValue(value) {
+            if (value === null || value === undefined) return '-';
+            if (typeof value === 'number') {
+                return value.toLocaleString(undefined, {maximumFractionDigits: 4});
+            }
+            return escapeHtml(String(value));
+        }
+        
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function clearResults() {
+            document.getElementById('query-status').innerHTML = '';
+            document.getElementById('row-count').textContent = '';
+            document.getElementById('results-container').innerHTML = '<div class="empty">Run a query to see results</div>';
+        }
+    </script>
+</body>
+</html>

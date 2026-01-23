@@ -71,11 +71,8 @@ class SmartFormatter(logging.Formatter):
     
     @staticmethod
     def _supports_color() -> bool:
-        """Check if the terminal supports colors."""
-        # Windows 10+ supports ANSI, but check anyway
-        if sys.platform == "win32":
-            return os.environ.get("TERM") is not None or \
-                   os.environ.get("WT_SESSION") is not None
+        """Check if the terminal supports colors (Linux Docker containers)."""
+        # Linux terminals typically support ANSI colors
         return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
     
     def format(self, record: logging.LogRecord) -> str:

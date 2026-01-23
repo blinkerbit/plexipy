@@ -126,6 +126,9 @@ class ProcessManager:
         Returns:
             AppProcess object if successful, None otherwise
         """
+        # Resolve all paths to absolute for reliable operations in Docker
+        app_path = Path(app_path).resolve()
+        
         # Check if app is already running
         if app_name in self._processes:
             existing = self._processes[app_name]
@@ -138,16 +141,43 @@ class ProcessManager:
         
         # Get the isolated app runner script path
         runner_script = Path(__file__).parent / "templates" / "isolated_app.py"
+        runner_script = runner_script.resolve()
         
         if not runner_script.exists():
             logger.error(f"Isolated app runner not found at {runner_script}")
             return None
         
         # Determine Python executable
-        if venv_path and venv_path.exists():
+        # IMPORTANT: For isolated apps, we MUST use the venv's Python, not system Python
+        # The venv should be in the app folder: {app_path}/.venv
+        if venv_path:
+            venv_path = Path(venv_path).resolve()
+            if not venv_path.exists():
+                logger.error(
+                    f"Venv path does not exist: {venv_path}. "
+                    f"Cannot start isolated app without venv. "
+                    f"Expected venv location: {app_path}/.venv (inside app folder)"
+                )
+                return None
+            
+            # Get venv Python (don't resolve symlinks - venv python sets up paths correctly)
             python_exe = self.venv_manager.get_python_executable(venv_path)
+            
+            if not python_exe.exists():
+                logger.error(
+                    f"Python executable not found at {python_exe} in venv {venv_path}. "
+                    f"Venv may be invalid or corrupted. Cannot start isolated app."
+                )
+                return None
+            
+            logger.info(f"Using venv Python for isolated app '{app_name}': {python_exe}")
         else:
-            python_exe = Path(sys.executable)
+            # No venv_path provided - this should not happen for isolated apps
+            logger.error(
+                f"No venv_path provided for isolated app '{app_name}'. "
+                f"Isolated apps require a venv. Cannot start."
+            )
+            return None
         
         # Build environment variables
         env = os.environ.copy()
@@ -159,21 +189,44 @@ class ProcessManager:
         env["PYREST_AUTH_CONFIG"] = str(Path(self.config.auth_config_file).absolute())
         
         if venv_path:
+            venv_path = Path(venv_path).resolve()
             env["VIRTUAL_ENV"] = str(venv_path)
+            # Add venv's bin directory to PATH (Linux)
+            venv_bin = venv_path / "bin"
+            if venv_bin.exists():
+                current_path = env.get("PATH", "")
+                env["PATH"] = f"{venv_bin}:{current_path}"
+                logger.debug(f"Added venv bin to PATH: {venv_bin}")
         
         try:
             logger.info(f"Spawning isolated app '{app_name}' on port {port}")
-            logger.debug(f"Python: {python_exe}, Script: {runner_script}")
+            logger.info(
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            logger.info(
+                f"Python executable path for isolated app '{app_name}': {python_exe}"
+            )
+            logger.info(
+                f"Venv path for isolated app '{app_name}': {venv_path if venv_path else 'None (using system Python)'}"
+            )
+            logger.info(
+                f"App path for isolated app '{app_name}': {app_path}"
+            )
+            logger.info(
+                f"Runner script for isolated app '{app_name}': {runner_script}"
+            )
+            logger.info(
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            logger.debug(f"Full command: {python_exe} {runner_script}")
             
-            # Spawn the process
+            # Spawn the process (Linux Docker container)
             process = subprocess.Popen(
                 [str(python_exe), str(runner_script)],
                 cwd=str(app_path),
                 env=env,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                # Don't create new console window on Windows
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                stderr=subprocess.PIPE
             )
             
             # Wait briefly to check if process started successfully

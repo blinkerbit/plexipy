@@ -243,10 +243,16 @@ class PyRestApplication(tornado.web.Application):
                 logger.info(f"Setting up isolated app: {app_config.name}")
                 
                 # Ensure venv exists and dependencies are installed
+                # Resolve paths to absolute for reliable operations in Docker
+                app_path = app_config.path.resolve()
+                venv_name = app_config.venv_path if app_config.venv_path else ".venv"
                 success, venv_path, message = self.venv_manager.ensure_venv(
-                    app_config.path,
-                    app_config.venv_path
+                    app_path,
+                    venv_name
                 )
+                # Resolve venv_path to absolute
+                if venv_path:
+                    venv_path = venv_path.resolve()
                 
                 if not success:
                     error_msg = f"Failed to setup venv: {message}"
@@ -267,13 +273,30 @@ class PyRestApplication(tornado.web.Application):
                 
                 logger.info(f"Venv ready for {app_config.name}: {message}")
                 
+                # Verify venv_path is valid
+                if not venv_path or not venv_path.exists():
+                    error_msg = f"Venv path is invalid or does not exist: {venv_path}"
+                    logger.error(f"Failed to setup venv for {app_config.name}: {error_msg}")
+                    self.app_loader.failed_apps[app_config.name] = {
+                        "name": app_config.name,
+                        "path": str(app_config.path),
+                        "error": error_msg,
+                        "error_type": "venv_setup_error",
+                        "isolated": True,
+                        "port": app_config.port
+                    }
+                    if app_config.name in self.app_loader.isolated_apps:
+                        del self.app_loader.isolated_apps[app_config.name]
+                    continue
+                
                 # Spawn the isolated app
                 try:
+                    # Use resolved paths - venv_path is required and validated
                     app_process = self.process_manager.spawn_app(
                         app_name=app_config.name,
-                        app_path=app_config.path,
+                        app_path=app_path,
                         port=app_config.port,
-                        venv_path=venv_path if venv_path.exists() else None
+                        venv_path=venv_path  # Always provided and validated
                     )
                     
                     if not app_process:

@@ -24,6 +24,8 @@ import json
 import time
 from typing import Dict, Any, Optional, List
 
+import tornado.web
+
 # Import TM1 utilities from pyrest.utils
 try:
     from pyrest.utils.tm1 import TM1ConnectionManager, TM1InstanceConfig, is_tm1_available
@@ -34,6 +36,20 @@ except ImportError:
     TM1_AVAILABLE = False
     TM1ConnectionManager = None
     TM1InstanceConfig = None
+    
+    # Fallback logging stubs for isolated execution
+    class AppLogger:
+        """Stub AppLogger for isolated execution."""
+        def info(self, msg): pass
+        def debug(self, msg): pass
+        def warning(self, msg): pass
+        def error(self, msg): pass
+    
+    def setup_app_logging(*args, **kwargs):
+        return None
+    
+    def get_app_logger(*args, **kwargs):
+        return None
     
     # Try direct TM1py import
     try:
@@ -542,10 +558,35 @@ class TM1QueryHandler(TM1BaseHandler):
             self.error(f"TM1 query error: {str(e)}", 500)
 
 
+class TM1UIHandler(tornado.web.RequestHandler):
+    """Serve the TM1 Data Connector UI."""
+    
+    def initialize(self, app_config=None, **kwargs):
+        self.app_config = app_config or {}
+    
+    async def get(self):
+        """Serve the main UI page."""
+        import os
+        # Get the static folder path relative to this file
+        app_path = os.environ.get('PYREST_APP_PATH', os.path.dirname(__file__))
+        html_path = os.path.join(app_path, 'static', 'index.html')
+        
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                self.set_header('Content-Type', 'text/html')
+                self.write(f.read())
+        except FileNotFoundError:
+            self.set_status(404)
+            self.write({'error': 'UI not found', 'path': html_path})
+
+
 def get_handlers():
     """Return the list of handlers for this app."""
     return [
-        # Main info endpoint
+        # UI - Web interface for TM1 connections and queries
+        (r"/ui", TM1UIHandler),
+        
+        # API info endpoint
         (r"/", TM1InfoHandler),
         
         # List all instances

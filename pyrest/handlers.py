@@ -64,6 +64,43 @@ class BaseHandler(tornado.web.RequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             return {}
     
+    def load_args(self) -> Dict[str, Any]:
+        """
+        Load all request arguments into a unified dictionary.
+        
+        Returns a dict with:
+            - args['path']  - URL path parameters (e.g., /instance/{name} -> args['path']['name'])
+            - args['query'] - URL query parameters (e.g., ?limit=10 -> args['query']['limit'])
+            - args['body']  - JSON request body as dict
+        
+        Example usage in handler:
+            args = self.load_args()
+            instance_name = args['path'].get('instance_name')
+            limit = args['query'].get('limit', '100')
+            data = args['body']
+        """
+        # Path parameters (from URL pattern captures)
+        path_args = dict(self.path_kwargs) if hasattr(self, 'path_kwargs') else {}
+        
+        # Query parameters (flatten single-value lists)
+        query_args = {}
+        for key, values in self.request.arguments.items():
+            if len(values) == 1:
+                # Single value - decode and return as string
+                query_args[key] = values[0].decode('utf-8') if isinstance(values[0], bytes) else values[0]
+            else:
+                # Multiple values - return as list of strings
+                query_args[key] = [v.decode('utf-8') if isinstance(v, bytes) else v for v in values]
+        
+        # Body (JSON parsed)
+        body = self.get_json_body()
+        
+        return {
+            'path': path_args,
+            'query': query_args,
+            'body': body
+        }
+    
     def write_error(self, status_code: int, **kwargs):
         """Write error response as JSON."""
         error_message = kwargs.get("reason", self._reason)

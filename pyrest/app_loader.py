@@ -144,7 +144,9 @@ class AppLoader:
     
     def __init__(self, apps_folder: Optional[str] = None):
         self.config = get_config()
-        self.apps_folder = Path(apps_folder or self.config.apps_folder)
+        apps_folder_path = apps_folder or self.config.apps_folder
+        # Resolve to absolute path - supports both relative and absolute paths
+        self.apps_folder = Path(apps_folder_path).resolve()
         self.loaded_apps: Dict[str, AppConfig] = {}
         self.isolated_apps: Dict[str, AppConfig] = {}
         self.failed_apps: Dict[str, Dict[str, Any]] = {}  # Track failed apps with error info

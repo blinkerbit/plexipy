@@ -1,0 +1,25 @@
+{
+  "name": "tm1query",
+  "version": "1.0.0",
+  "description": "TM1 MDX Query Tool - Configure connections and run MDX queries",
+  "enabled": true,
+  "prefix": "/tm1query",
+  "port": 8002,
+  "auth_required": false,
+  "settings": {
+    "log_level": "INFO",
+    "max_rows": 10000,
+    "query_timeout": 300
+  },
+  "tm1_instances": {
+    "default": {
+      "description": "Default TM1 Instance",
+      "connection_type": "onprem",
+      "server": "${TM1_SERVER:-localhost}",
+      "port": "${TM1_PORT:-8010}",
+      "user": "${TM1_USER:-admin}",
+      "password": "${TM1_PASSWORD:-}",
+      "ssl": true
+    }
+  }
+}
