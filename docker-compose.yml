@@ -5,6 +5,14 @@
 #   docker-compose up -d --build      # Rebuild and start
 #   docker-compose logs -f pyrest     # View logs
 #   docker-compose down               # Stop all services
+#
+# Air-Gapped / Internal PyPI Proxy:
+#   For environments without internet access, configure an internal PyPI proxy:
+#   
+#   Build with proxy:
+#     docker-compose build --build-arg PIP_INDEX_URL=https://pypi.internal.company.com/simple/
+#   
+#   Or set environment variables below for runtime package installs (isolated apps)
 
 version: '3.8'
 
@@ -16,6 +24,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Uncomment for air-gapped builds with internal PyPI proxy:
+      # args:
+      #   PIP_INDEX_URL: https://pypi.internal.company.com/simple/
+      #   PIP_TRUSTED_HOST: pypi.internal.company.com
     container_name: pyrest-main
     restart: unless-stopped
     ports:
@@ -24,6 +36,13 @@ services:
       - PYREST_HOST=0.0.0.0
       - PYREST_PORT=8000
       - PYREST_DEBUG=false
+      # -----------------------------------------------------------------------
+      # Air-Gapped Environment: Uncomment for internal PyPI proxy
+      # (uv automatically uses PIP_INDEX_URL - no separate config needed)
+      # -----------------------------------------------------------------------
+      # - PIP_INDEX_URL=https://pypi.internal.company.com/simple/
+      # - PIP_TRUSTED_HOST=pypi.internal.company.com
+      # -----------------------------------------------------------------------
       # Apps folder can be configured via environment variable (defaults to "apps" from config.json)
       # Set PYREST_APPS_FOLDER to use a different path (e.g., /custom/path/to/apps)
     volumes:
@@ -78,7 +97,7 @@ services:
   # Nginx Reverse Proxy
   # =========================================================================
   nginx:
-    image: nginx:alpine
+    image: nginx:1.21.6-alpine
     container_name: pyrest-nginx
     restart: unless-stopped
     ports:

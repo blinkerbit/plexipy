@@ -5,7 +5,19 @@ Provides connection management for multiple TM1 instances supporting both:
 - TM1 On-Premise (traditional TM1 servers)
 - TM1 Cloud (IBM Planning Analytics as a Service)
 
-Usage:
+Simple Usage (Recommended):
+    from pyrest.utils.tm1 import get_tm1_instance
+    
+    # Get connection to a specific instance (defined in tm1_config.json)
+    with get_tm1_instance("production") as tm1:
+        cubes = tm1.cubes.get_all_names()
+    
+    # Or without context manager
+    tm1 = get_tm1_instance("development")
+    cubes = tm1.cubes.get_all_names()
+    tm1.logout()
+
+Advanced Usage:
     from pyrest.utils import TM1ConnectionManager, TM1InstanceConfig
     
     # Initialize with app config
@@ -462,3 +474,164 @@ class TM1ConnectionManager:
                 status["error"] = str(e)
         
         return status
+
+
+# =============================================================================
+# Simple Interface Functions
+# =============================================================================
+
+# Global config path (can be overridden)
+_TM1_CONFIG_PATH: Optional[str] = None
+_TM1_CONFIG_LOADED: bool = False
+
+
+def set_tm1_config_path(path: str) -> None:
+    """
+    Set custom path for tm1_config.json.
+    
+    Args:
+        path: Absolute or relative path to the config file
+    """
+    global _TM1_CONFIG_PATH, _TM1_CONFIG_LOADED
+    _TM1_CONFIG_PATH = path
+    _TM1_CONFIG_LOADED = False
+
+
+def _load_central_config() -> None:
+    """Load the central tm1_config.json file."""
+    global _TM1_CONFIG_LOADED
+    
+    if _TM1_CONFIG_LOADED:
+        return
+    
+    # Determine config path
+    config_path = _TM1_CONFIG_PATH
+    
+    if not config_path:
+        # Try common locations
+        possible_paths = [
+            os.path.join(os.getcwd(), "tm1_config.json"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "tm1_config.json"),
+            "/app/tm1_config.json",  # Docker path
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                config_path = path
+                break
+    
+    if not config_path or not os.path.exists(config_path):
+        logger.warning("tm1_config.json not found. Use set_tm1_config_path() or create the file.")
+        _TM1_CONFIG_LOADED = True
+        return
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Convert to app_config format for TM1ConnectionManager
+        app_config = {
+            "settings": config.get("settings", {}),
+            "tm1_instances": config.get("instances", {})
+        }
+        
+        # Reset and reinitialize
+        TM1ConnectionManager.reset()
+        TM1ConnectionManager.initialize(app_config)
+        
+        logger.info(f"Loaded TM1 config from: {config_path}")
+        _TM1_CONFIG_LOADED = True
+        
+    except Exception as e:
+        logger.error(f"Error loading tm1_config.json: {e}")
+        _TM1_CONFIG_LOADED = True
+
+
+def get_tm1_instance(instance_name: str = None) -> Optional[Any]:
+    """
+    Get a TM1 connection by instance name.
+    
+    This is the simplest way to connect to TM1. Instance configurations
+    are defined in tm1_config.json at the project root.
+    
+    Args:
+        instance_name: Name of the TM1 instance (uses 'default' if not specified)
+    
+    Returns:
+        TM1Service instance ready to use
+    
+    Example:
+        # Connect to development server
+        tm1 = get_tm1_instance("development")
+        cubes = tm1.cubes.get_all_names()
+        tm1.logout()
+        
+        # Or use context manager for automatic cleanup
+        with get_tm1_instance("production") as tm1:
+            value = tm1.cubes.cells.get_value("SalesCube", "2024,North,Sales")
+    
+    Raises:
+        RuntimeError: If TM1py is not installed
+        ConnectionError: If connection fails
+    """
+    if not TM1_AVAILABLE:
+        raise RuntimeError("TM1py is not installed. Install with: pip install TM1py")
+    
+    # Ensure config is loaded
+    _load_central_config()
+    
+    # Get connection
+    name = instance_name or TM1ConnectionManager.get_default_instance()
+    tm1 = TM1ConnectionManager.get_connection(name)
+    
+    if tm1 is None:
+        available = TM1ConnectionManager.list_instance_names()
+        raise ConnectionError(
+            f"Failed to connect to TM1 instance '{name}'. "
+            f"Available instances: {available}"
+        )
+    
+    return tm1
+
+
+def list_tm1_instances() -> List[str]:
+    """
+    List all configured TM1 instance names.
+    
+    Returns:
+        List of instance names from tm1_config.json
+    """
+    _load_central_config()
+    return TM1ConnectionManager.list_instance_names()
+
+
+def get_tm1_instance_info(instance_name: str = None) -> Dict[str, Any]:
+    """
+    Get configuration info for a TM1 instance (without connecting).
+    
+    Args:
+        instance_name: Name of the instance (uses default if not specified)
+    
+    Returns:
+        Dictionary with instance configuration (sensitive data masked)
+    """
+    _load_central_config()
+    config = TM1ConnectionManager.get_instance_config(instance_name)
+    if config:
+        return config.to_dict()
+    return {"error": f"Instance '{instance_name}' not found"}
+
+
+def close_tm1_instance(instance_name: str = None) -> None:
+    """
+    Close a TM1 connection.
+    
+    Args:
+        instance_name: Name of the instance to close (uses default if not specified)
+    """
+    TM1ConnectionManager.close_connection(instance_name)
+
+
+def close_all_tm1_instances() -> None:
+    """Close all active TM1 connections."""
+    TM1ConnectionManager.close_all_connections()

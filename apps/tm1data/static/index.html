@@ -6,92 +6,191 @@
     <title>TM1 Data Connector</title>
     <style>
         :root {
-            --bg: #1a1a2e;
-            --bg-card: #16213e;
-            --bg-input: #0f3460;
-            --fg: #e0e0e0;
-            --fg-dim: #8892b0;
-            --fg-bright: #ffffff;
-            --accent: #00d4ff;
-            --accent-hover: #00a8cc;
-            --success: #00c853;
-            --warning: #ffab00;
-            --error: #ff5252;
-            --border: #2d3a5c;
+            --bg: #002b36;
+            --bg-alt: #073642;
+            --fg: #93a1a1;
+            --fg-dim: #586e75;
+            --fg-bright: #eee8d5;
+            --accent: #268bd2;
+            --success: #859900;
+            --warning: #b58900;
+            --error: #dc322f;
+            --cyan: #2aa198;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: var(--bg);
             color: var(--fg);
             line-height: 1.6;
             min-height: 100vh;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 1.5rem;
+            padding: 2rem 1.5rem;
         }
-        
-        /* Header */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 0 1.5rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 1.5rem;
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            color: var(--bg);
+            border-bottom: 1px solid var(--bg-alt);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
         }
         h1 {
             font-size: 1.5rem;
-            font-weight: 600;
+            font-weight: normal;
             color: var(--fg-bright);
+            letter-spacing: 0.05em;
         }
-        h1 span { color: var(--accent); }
-        .status-badge {
-            padding: 0.35rem 0.75rem;
-            border-radius: 20px;
+        h1 span { color: var(--fg-dim); }
+        h2 {
+            font-size: 0.85rem;
+            font-weight: normal;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--fg-dim);
+            margin-bottom: 1rem;
+        }
+        .btn {
+            background: var(--bg-alt);
+            color: var(--fg);
+            border: 1px solid var(--fg-dim);
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn:hover {
+            background: #0a4052;
+            color: var(--fg-bright);
+            border-color: var(--fg);
+        }
+        .btn.primary {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn.primary:hover {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        .btn.success {
+            border-color: var(--success);
+            color: var(--success);
+        }
+        .btn.success:hover {
+            background: var(--success);
+            color: var(--bg);
+        }
+        .btn.danger {
+            border-color: var(--error);
+            color: var(--error);
+        }
+        .btn.danger:hover {
+            background: var(--error);
+            color: var(--bg);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-sm {
+            padding: 0.3rem 0.6rem;
             font-size: 0.75rem;
-            font-weight: 500;
         }
-        .status-connected { background: rgba(0, 200, 83, 0.2); color: var(--success); }
-        .status-disconnected { background: rgba(255, 82, 82, 0.2); color: var(--error); }
-        
-        /* Tabs */
+        .grid {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 2rem;
+        }
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .panel {
+            background: var(--bg-alt);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--fg-dim);
+            margin-bottom: 0.5rem;
+        }
+        input, select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            color: var(--fg-bright);
+            padding: 0.5rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .form-row {
+            display: flex;
+            gap: 1rem;
+        }
+        .form-row .form-group { flex: 1; }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            color: var(--fg-bright);
+            padding: 1rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        .status {
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+        .status.success {
+            background: rgba(133, 153, 0, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+        .status.error {
+            background: rgba(220, 50, 47, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        .status.info {
+            background: rgba(38, 139, 210, 0.1);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
         .tabs {
             display: flex;
-            gap: 0.5rem;
+            gap: 0;
             margin-bottom: 1.5rem;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 0;
+            border-bottom: 1px solid var(--bg-alt);
         }
         .tab {
-            padding: 0.75rem 1.5rem;
             background: transparent;
             border: none;
-            color: var(--fg-dim);
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
             border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+            color: var(--fg-dim);
+            padding: 0.75rem 1.5rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.15s;
         }
         .tab:hover { color: var(--fg); }
         .tab.active {
@@ -100,410 +199,218 @@
         }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid var(--border);
-        }
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-        .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--fg-bright);
-        }
-        
-        /* Forms */
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
-        }
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.4rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--fg-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.7rem 1rem;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--fg-bright);
-            font-size: 0.9rem;
-            transition: border-color 0.2s;
-        }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        .form-group input::placeholder { color: var(--fg-dim); }
-        .form-row {
-            display: flex;
-            gap: 1rem;
-        }
-        .form-row .form-group { flex: 1; }
-        
-        /* Buttons */
-        .btn {
-            padding: 0.7rem 1.5rem;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .btn-primary {
-            background: var(--accent);
-            color: var(--bg);
-        }
-        .btn-primary:hover { background: var(--accent-hover); }
-        .btn-secondary {
-            background: var(--bg-input);
-            color: var(--fg);
-            border: 1px solid var(--border);
-        }
-        .btn-secondary:hover { background: var(--border); }
-        .btn-danger {
-            background: rgba(255, 82, 82, 0.2);
-            color: var(--error);
-        }
-        .btn-danger:hover { background: rgba(255, 82, 82, 0.3); }
-        .btn-success {
-            background: rgba(0, 200, 83, 0.2);
-            color: var(--success);
-        }
-        .btn-success:hover { background: rgba(0, 200, 83, 0.3); }
-        .btn-sm {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.8rem;
-        }
-        .btn-group {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-        
-        /* Connection List */
-        .connection-list {
-            display: grid;
-            gap: 1rem;
-        }
         .connection-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.25rem;
-            background: var(--bg-input);
-            border-radius: 8px;
-            border: 1px solid var(--border);
+            padding: 0.75rem;
+            background: var(--bg);
+            border: 1px solid var(--fg-dim);
+            margin-bottom: 0.5rem;
         }
-        .connection-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+        .connection-item:hover {
+            border-color: var(--accent);
         }
-        .connection-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--bg-card);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-        .connection-details h3 {
-            font-size: 0.95rem;
-            font-weight: 600;
+        .connection-info h3 {
+            font-size: 0.9rem;
+            font-weight: normal;
             color: var(--fg-bright);
             margin-bottom: 0.2rem;
         }
-        .connection-details p {
-            font-size: 0.8rem;
+        .connection-info p {
+            font-size: 0.75rem;
             color: var(--fg-dim);
         }
         .connection-actions {
             display: flex;
             gap: 0.5rem;
         }
-        
-        /* MDX Editor */
-        .mdx-editor {
-            width: 100%;
-            min-height: 200px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.9rem;
-            resize: vertical;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            color: var(--fg-bright);
-        }
-        .mdx-editor:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        
-        /* Results Table */
         .results-container {
-            overflow-x: auto;
-            margin-top: 1rem;
+            background: var(--bg-alt);
+            padding: 1rem;
+            max-height: 500px;
+            overflow: auto;
         }
-        .results-table {
+        table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
         }
-        .results-table th, .results-table td {
-            padding: 0.75rem 1rem;
+        th {
             text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-        .results-table th {
-            background: var(--bg-input);
-            color: var(--fg-dim);
-            font-weight: 500;
+            font-weight: normal;
             text-transform: uppercase;
-            font-size: 0.75rem;
             letter-spacing: 0.05em;
+            color: var(--fg-dim);
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--fg-dim);
+            position: sticky;
+            top: 0;
+            background: var(--bg-alt);
         }
-        .results-table tr:hover td {
-            background: rgba(0, 212, 255, 0.05);
+        td {
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .results-count {
+        tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+        .value-cell {
+            color: var(--cyan);
+            text-align: right;
+        }
+        .empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--fg-dim);
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--fg-dim);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+            opacity: 0;
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .row-count {
             font-size: 0.8rem;
             color: var(--fg-dim);
-            margin-top: 0.75rem;
-        }
-        
-        /* Messages */
-        .message {
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        .message-success { background: rgba(0, 200, 83, 0.15); color: var(--success); }
-        .message-error { background: rgba(255, 82, 82, 0.15); color: var(--error); }
-        .message-info { background: rgba(0, 212, 255, 0.15); color: var(--accent); }
-        
-        /* Loading */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--border);
-            border-radius: 50%;
-            border-top-color: var(--accent);
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-overlay.active { display: flex; }
-        .modal {
-            background: var(--bg-card);
-            border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-        .modal-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--fg-bright);
-        }
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--fg-dim);
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-        }
-        .modal-close:hover { color: var(--fg); }
-        .modal-body { padding: 1.5rem; }
-        .modal-footer {
-            padding: 1rem 1.5rem;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-        }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: var(--fg-dim);
-        }
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-        .empty-state h3 {
-            font-size: 1.1rem;
             margin-bottom: 0.5rem;
-            color: var(--fg);
         }
-        
-        /* Layout Grid */
-        .layout-split {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 1.5rem;
+        a {
+            color: var(--accent);
+            text-decoration: none;
         }
-        @media (max-width: 900px) {
-            .layout-split { grid-template-columns: 1fr; }
+        a:hover {
+            text-decoration: underline;
+        }
+        .nav-link {
+            font-size: 0.85rem;
+        }
+        .cube-item {
+            padding: 0.4rem 0.5rem;
+            cursor: pointer;
+            color: var(--accent);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .cube-item:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        .dim-item {
+            padding: 0.3rem 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dim-num {
+            color: var(--cyan);
+            font-weight: bold;
+            width: 20px;
+        }
+        .conn-count {
+            font-size: 0.75rem;
+            color: var(--fg-dim);
+            margin-left: 0.5rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="logo">
-                <div class="logo-icon">TM1</div>
-                <h1>TM1 <span>Data Connector</span></h1>
-            </div>
-            <div id="globalStatus" class="status-badge status-disconnected">Not Connected</div>
+        <header class="fade-in">
+            <h1>TM1 <span>Data Connector</span></h1>
+            <a href="/pyrest" class="btn nav-link">Back to PyRest</a>
         </header>
         
-        <div class="tabs">
+        <div class="tabs fade-in">
             <button class="tab active" data-tab="connections">Connections</button>
             <button class="tab" data-tab="query">MDX Query</button>
             <button class="tab" data-tab="cubes">Browse Cubes</button>
         </div>
         
-        <div id="messageArea"></div>
+        <div id="message-area"></div>
         
         <!-- Connections Tab -->
-        <div id="connections" class="tab-content active">
-            <div class="layout-split">
-                <div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Add Connection</span>
-                        </div>
-                        <form id="connectionForm">
+        <div id="connections" class="tab-content active fade-in">
+            <div class="grid">
+                <div class="sidebar">
+                    <div class="panel">
+                        <h2>Add Connection</h2>
+                        <form id="connection-form">
                             <div class="form-group">
                                 <label>Connection Name</label>
-                                <input type="text" id="connName" placeholder="e.g., Production" required>
+                                <input type="text" id="conn-name" placeholder="e.g., Production" required>
                             </div>
                             <div class="form-group">
-                                <label>Connection Type</label>
-                                <select id="connType">
+                                <label>Type</label>
+                                <select id="conn-type">
                                     <option value="onprem">On-Premise</option>
                                     <option value="cloud">IBM Cloud (PAW)</option>
                                 </select>
                             </div>
-                            <div id="onpremFields">
+                            <div id="onprem-fields">
                                 <div class="form-group">
                                     <label>Server Address</label>
-                                    <input type="text" id="connAddress" placeholder="e.g., tm1server.company.com">
+                                    <input type="text" id="conn-address" placeholder="tm1server.company.com">
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>HTTP Port</label>
-                                        <input type="number" id="connPort" placeholder="8010" value="8010">
+                                        <label>Port</label>
+                                        <input type="number" id="conn-port" value="8010">
                                     </div>
                                     <div class="form-group">
                                         <label>SSL</label>
-                                        <select id="connSSL">
-                                            <option value="true">Yes (HTTPS)</option>
-                                            <option value="false">No (HTTP)</option>
+                                        <select id="conn-ssl">
+                                            <option value="true">Yes</option>
+                                            <option value="false">No</option>
                                         </select>
                                     </div>
                                 </div>
                             </div>
-                            <div id="cloudFields" style="display: none;">
+                            <div id="cloud-fields" style="display: none;">
                                 <div class="form-group">
                                     <label>TM1 Server URL</label>
-                                    <input type="text" id="connCloudUrl" placeholder="https://xxx.planning-analytics.ibmcloud.com/tm1/api/v1">
+                                    <input type="text" id="conn-cloud-url" placeholder="https://xxx.planning-analytics.ibmcloud.com">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>Username</label>
-                                <input type="text" id="connUser" placeholder="admin">
+                                <input type="text" id="conn-user" placeholder="admin">
                             </div>
                             <div class="form-group">
                                 <label>Password</label>
-                                <input type="password" id="connPassword" placeholder="********">
+                                <input type="password" id="conn-password">
                             </div>
                             <div class="form-group">
                                 <label>Namespace (CAM only)</label>
-                                <input type="text" id="connNamespace" placeholder="Leave empty for TM1 native auth">
+                                <input type="text" id="conn-namespace" placeholder="Leave empty for native auth">
                             </div>
-                            <div class="btn-group">
-                                <button type="submit" class="btn btn-primary">Save Connection</button>
-                                <button type="button" class="btn btn-secondary" id="testConnBtn">Test</button>
+                            <div class="actions">
+                                <button type="submit" class="btn primary">Save Connection</button>
+                                <button type="button" class="btn" onclick="testConnection()">Test</button>
                             </div>
                         </form>
+                        <div id="connection-status" style="margin-top: 1rem;"></div>
                     </div>
                 </div>
                 
-                <div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Saved Connections</span>
-                            <span id="connCount" class="status-badge status-disconnected">0 connections</span>
-                        </div>
-                        <div id="connectionList" class="connection-list">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">&#128268;</div>
-                                <h3>No connections configured</h3>
-                                <p>Add a TM1 connection to get started</p>
-                            </div>
+                <div class="main">
+                    <div class="panel">
+                        <h2>Saved Connections <span id="conn-count" class="conn-count">(0)</span></h2>
+                        <div id="connection-list">
+                            <div class="empty">No connections configured. Add one to get started.</div>
                         </div>
                     </div>
                 </div>
@@ -511,147 +418,91 @@
         </div>
         
         <!-- MDX Query Tab -->
-        <div id="query" class="tab-content">
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">MDX Query</span>
-                    <div style="display: flex; gap: 1rem; align-items: center;">
-                        <label style="font-size: 0.8rem; color: var(--fg-dim);">Instance:</label>
-                        <select id="queryInstance" style="padding: 0.4rem 0.8rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; color: var(--fg-bright);">
-                            <option value="">Select connection...</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>MDX Statement</label>
-                    <textarea id="mdxQuery" class="mdx-editor" placeholder="SELECT 
-  {[Measures].[Amount]} ON COLUMNS,
-  {[Time].[Year].Members} ON ROWS
-FROM [SalesCube]"></textarea>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-primary" id="executeBtn">Execute Query</button>
-                    <button class="btn btn-secondary" id="clearQueryBtn">Clear</button>
-                </div>
-            </div>
-            
-            <div class="card" id="resultsCard" style="display: none;">
-                <div class="card-header">
-                    <span class="card-title">Query Results</span>
-                    <button class="btn btn-sm btn-secondary" id="exportCsvBtn">Export CSV</button>
-                </div>
-                <div id="queryResults" class="results-container"></div>
-                <div id="resultsCount" class="results-count"></div>
-            </div>
-        </div>
-        
-        <!-- Browse Cubes Tab -->
-        <div id="cubes" class="tab-content">
-            <div class="layout-split">
-                <div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Instance</span>
-                        </div>
+        <div id="query" class="tab-content fade-in">
+            <div class="grid">
+                <div class="sidebar">
+                    <div class="panel">
+                        <h2>Connection</h2>
                         <div class="form-group">
-                            <select id="cubeInstance" style="width: 100%;">
+                            <label>Instance</label>
+                            <select id="query-instance">
                                 <option value="">Select connection...</option>
                             </select>
-                        </div>
-                        <button class="btn btn-primary" id="loadCubesBtn" style="width: 100%;">Load Cubes</button>
-                    </div>
-                    
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Cubes</span>
-                            <span id="cubeCount" class="status-badge status-disconnected">0</span>
-                        </div>
-                        <div id="cubeList" style="max-height: 400px; overflow-y: auto;">
-                            <div class="empty-state">
-                                <p>Select an instance and click Load Cubes</p>
-                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title" id="cubeDetailTitle">Cube Details</span>
+                <div class="main">
+                    <div class="panel">
+                        <h2>MDX Query</h2>
+                        <textarea id="mdx-query" placeholder="SELECT
+  {[Measures].[Amount]} ON COLUMNS,
+  {TM1SubsetAll([Product])} ON ROWS
+FROM [SalesCube]"></textarea>
+                        <div class="actions">
+                            <button class="btn primary" onclick="executeQuery()">Run Query</button>
+                            <button class="btn" onclick="clearQuery()">Clear</button>
                         </div>
-                        <div id="cubeDetails">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">&#128230;</div>
-                                <h3>Select a cube</h3>
-                                <p>Click on a cube to view its dimensions</p>
-                            </div>
+                    </div>
+                    
+                    <div class="panel" id="results-panel" style="display: none;">
+                        <h2>Results</h2>
+                        <div id="query-status"></div>
+                        <div id="row-count" class="row-count"></div>
+                        <div class="results-container" id="results-container">
+                            <div class="empty">Run a query to see results</div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn" onclick="exportCsv()">Export CSV</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-    
-    <!-- Connection Modal -->
-    <div class="modal-overlay" id="editModal">
-        <div class="modal">
-            <div class="modal-header">
-                <span class="modal-title">Edit Connection</span>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="editConnectionForm">
-                    <input type="hidden" id="editConnOrigName">
-                    <div class="form-group">
-                        <label>Connection Name</label>
-                        <input type="text" id="editConnName" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Server Address</label>
-                        <input type="text" id="editConnAddress">
-                    </div>
-                    <div class="form-row">
+        
+        <!-- Browse Cubes Tab -->
+        <div id="cubes" class="tab-content fade-in">
+            <div class="grid">
+                <div class="sidebar">
+                    <div class="panel">
+                        <h2>Instance</h2>
                         <div class="form-group">
-                            <label>Port</label>
-                            <input type="number" id="editConnPort">
-                        </div>
-                        <div class="form-group">
-                            <label>SSL</label>
-                            <select id="editConnSSL">
-                                <option value="true">Yes</option>
-                                <option value="false">No</option>
+                            <select id="cube-instance">
+                                <option value="">Select connection...</option>
                             </select>
                         </div>
+                        <button class="btn primary" onclick="loadCubes()" style="width: 100%;">Load Cubes</button>
                     </div>
-                    <div class="form-group">
-                        <label>Username</label>
-                        <input type="text" id="editConnUser">
+                    
+                    <div class="panel" id="cubes-panel" style="display: none;">
+                        <h2>Cubes <span id="cube-count" class="conn-count">(0)</span></h2>
+                        <div id="cube-list" style="max-height: 400px; overflow-y: auto;"></div>
                     </div>
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" id="editConnPassword" placeholder="Leave empty to keep current">
+                </div>
+                
+                <div class="main">
+                    <div class="panel">
+                        <h2 id="cube-detail-title">Cube Details</h2>
+                        <div id="cube-details">
+                            <div class="empty">Select a cube to view its dimensions</div>
+                        </div>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveEditedConnection()">Save Changes</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         // ============================================
-        // TM1 Data Connector - Client Application
+        // TM1 Data Connector
         // ============================================
         
-        const API_BASE = '/pyrest/tm1data';
+        var API_BASE = '/pyrest/tm1data';
+        var STORAGE_KEY = 'tm1_connections';
         
-        // Connection storage (localStorage)
-        const STORAGE_KEY = 'tm1_connections';
-        
+        // Storage
         function getConnections() {
-            const data = localStorage.getItem(STORAGE_KEY);
+            var data = localStorage.getItem(STORAGE_KEY);
             return data ? JSON.parse(data) : {};
         }
         
@@ -659,36 +510,20 @@ FROM [SalesCube]"></textarea>
             localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
         }
         
-        // ============================================
-        // Tab Management
-        // ============================================
-        
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        // Tabs
+        document.querySelectorAll('.tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+                document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
                 tab.classList.add('active');
                 document.getElementById(tab.dataset.tab).classList.add('active');
             });
         });
         
-        // ============================================
-        // Messages
-        // ============================================
-        
-        function showMessage(text, type = 'info') {
-            const area = document.getElementById('messageArea');
-            area.innerHTML = `<div class="message message-${type}">${text}</div>`;
-            setTimeout(() => area.innerHTML = '', 5000);
-        }
-        
-        // ============================================
-        // Connection Type Toggle
-        // ============================================
-        
-        document.getElementById('connType').addEventListener('change', function() {
-            const onprem = document.getElementById('onpremFields');
-            const cloud = document.getElementById('cloudFields');
+        // Connection type toggle
+        document.getElementById('conn-type').addEventListener('change', function() {
+            var onprem = document.getElementById('onprem-fields');
+            var cloud = document.getElementById('cloud-fields');
             if (this.value === 'cloud') {
                 onprem.style.display = 'none';
                 cloud.style.display = 'block';
@@ -698,170 +533,122 @@ FROM [SalesCube]"></textarea>
             }
         });
         
-        // ============================================
-        // Connection Management
-        // ============================================
+        // Messages
+        function showMessage(text, type) {
+            var area = document.getElementById('message-area');
+            area.innerHTML = '<div class="status ' + type + '">' + text + '</div>';
+            setTimeout(function() { area.innerHTML = ''; }, 5000);
+        }
         
+        function showStatus(elementId, message, type) {
+            var el = document.getElementById(elementId);
+            el.innerHTML = '<div class="status ' + type + '">' + message + '</div>';
+        }
+        
+        // Connection Management
         function renderConnections() {
-            const connections = getConnections();
-            const list = document.getElementById('connectionList');
-            const names = Object.keys(connections);
+            var connections = getConnections();
+            var list = document.getElementById('connection-list');
+            var names = Object.keys(connections);
             
-            document.getElementById('connCount').textContent = `${names.length} connection${names.length !== 1 ? 's' : ''}`;
+            document.getElementById('conn-count').textContent = '(' + names.length + ')';
             
-            // Update instance dropdowns
-            const selects = ['queryInstance', 'cubeInstance'];
-            selects.forEach(id => {
-                const select = document.getElementById(id);
-                const currentVal = select.value;
+            // Update dropdowns
+            ['query-instance', 'cube-instance'].forEach(function(id) {
+                var select = document.getElementById(id);
+                var currentVal = select.value;
                 select.innerHTML = '<option value="">Select connection...</option>';
-                names.forEach(name => {
-                    select.innerHTML += `<option value="${name}">${name}</option>`;
+                names.forEach(function(name) {
+                    var opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    select.appendChild(opt);
                 });
                 select.value = currentVal;
             });
             
             if (names.length === 0) {
-                list.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">&#128268;</div>
-                        <h3>No connections configured</h3>
-                        <p>Add a TM1 connection to get started</p>
-                    </div>`;
+                list.innerHTML = '<div class="empty">No connections configured. Add one to get started.</div>';
                 return;
             }
             
-            list.innerHTML = names.map(name => {
-                const conn = connections[name];
-                const address = conn.type === 'cloud' ? 'IBM Cloud' : `${conn.address}:${conn.port}`;
-                return `
-                    <div class="connection-item">
-                        <div class="connection-info">
-                            <div class="connection-icon">${conn.type === 'cloud' ? '&#9729;' : '&#128421;'}</div>
-                            <div class="connection-details">
-                                <h3>${name}</h3>
-                                <p>${address} &bull; ${conn.user}</p>
-                            </div>
-                        </div>
-                        <div class="connection-actions">
-                            <button class="btn btn-sm btn-success" onclick="testConnection('${name}')">Test</button>
-                            <button class="btn btn-sm btn-secondary" onclick="editConnection('${name}')">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteConnection('${name}')">Delete</button>
-                        </div>
-                    </div>`;
+            list.innerHTML = names.map(function(name) {
+                var conn = connections[name];
+                var address = conn.type === 'cloud' ? 'IBM Cloud' : conn.address + ':' + conn.port;
+                return '<div class="connection-item">' +
+                    '<div class="connection-info">' +
+                        '<h3>' + escapeHtml(name) + '</h3>' +
+                        '<p>' + escapeHtml(address) + ' | ' + escapeHtml(conn.user || 'no user') + '</p>' +
+                    '</div>' +
+                    '<div class="connection-actions">' +
+                        '<button class="btn btn-sm success" onclick="testSavedConnection(\'' + escapeHtml(name) + '\')">Test</button>' +
+                        '<button class="btn btn-sm danger" onclick="deleteConnection(\'' + escapeHtml(name) + '\')">Delete</button>' +
+                    '</div>' +
+                '</div>';
             }).join('');
         }
         
-        document.getElementById('connectionForm').addEventListener('submit', function(e) {
+        document.getElementById('connection-form').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const name = document.getElementById('connName').value.trim();
-            const type = document.getElementById('connType').value;
+            var name = document.getElementById('conn-name').value.trim();
+            var type = document.getElementById('conn-type').value;
             
-            const connection = {
+            var connection = {
                 type: type,
-                user: document.getElementById('connUser').value,
-                password: document.getElementById('connPassword').value,
-                namespace: document.getElementById('connNamespace').value
+                user: document.getElementById('conn-user').value,
+                password: document.getElementById('conn-password').value,
+                namespace: document.getElementById('conn-namespace').value
             };
             
             if (type === 'cloud') {
-                connection.cloudUrl = document.getElementById('connCloudUrl').value;
+                connection.cloudUrl = document.getElementById('conn-cloud-url').value;
             } else {
-                connection.address = document.getElementById('connAddress').value;
-                connection.port = parseInt(document.getElementById('connPort').value) || 8010;
-                connection.ssl = document.getElementById('connSSL').value === 'true';
+                connection.address = document.getElementById('conn-address').value;
+                connection.port = parseInt(document.getElementById('conn-port').value) || 8010;
+                connection.ssl = document.getElementById('conn-ssl').value === 'true';
             }
             
-            const connections = getConnections();
+            var connections = getConnections();
             connections[name] = connection;
             saveConnections(connections);
             
             this.reset();
+            document.getElementById('conn-port').value = '8010';
             renderConnections();
-            showMessage(`Connection "${name}" saved successfully`, 'success');
+            showMessage('Connection "' + name + '" saved', 'success');
         });
         
         function deleteConnection(name) {
-            if (!confirm(`Delete connection "${name}"?`)) return;
-            
-            const connections = getConnections();
+            if (!confirm('Delete connection "' + name + '"?')) return;
+            var connections = getConnections();
             delete connections[name];
             saveConnections(connections);
             renderConnections();
-            showMessage(`Connection "${name}" deleted`, 'info');
+            showMessage('Connection "' + name + '" deleted', 'info');
         }
         
-        function editConnection(name) {
-            const connections = getConnections();
-            const conn = connections[name];
+        function testConnection() {
+            var address = document.getElementById('conn-address').value || 'localhost';
+            var port = document.getElementById('conn-port').value || '8010';
+            var ssl = document.getElementById('conn-ssl').value === 'true';
+            var protocol = ssl ? 'https' : 'http';
+            showStatus('connection-status', 'Connection configured: ' + protocol + '://' + address + ':' + port, 'info');
+        }
+        
+        function testSavedConnection(name) {
+            var connections = getConnections();
+            var conn = connections[name];
             if (!conn) return;
             
-            document.getElementById('editConnOrigName').value = name;
-            document.getElementById('editConnName').value = name;
-            document.getElementById('editConnAddress').value = conn.address || '';
-            document.getElementById('editConnPort').value = conn.port || 8010;
-            document.getElementById('editConnSSL').value = conn.ssl ? 'true' : 'false';
-            document.getElementById('editConnUser').value = conn.user || '';
-            
-            document.getElementById('editModal').classList.add('active');
+            var address = conn.type === 'cloud' ? conn.cloudUrl : (conn.ssl ? 'https' : 'http') + '://' + conn.address + ':' + conn.port;
+            showMessage('Testing "' + name + '": ' + address, 'info');
         }
         
-        function closeModal() {
-            document.getElementById('editModal').classList.remove('active');
-        }
-        
-        function saveEditedConnection() {
-            const origName = document.getElementById('editConnOrigName').value;
-            const newName = document.getElementById('editConnName').value.trim();
-            
-            const connections = getConnections();
-            const conn = connections[origName];
-            
-            conn.address = document.getElementById('editConnAddress').value;
-            conn.port = parseInt(document.getElementById('editConnPort').value) || 8010;
-            conn.ssl = document.getElementById('editConnSSL').value === 'true';
-            conn.user = document.getElementById('editConnUser').value;
-            
-            const newPass = document.getElementById('editConnPassword').value;
-            if (newPass) conn.password = newPass;
-            
-            if (origName !== newName) {
-                delete connections[origName];
-            }
-            connections[newName] = conn;
-            
-            saveConnections(connections);
-            closeModal();
-            renderConnections();
-            showMessage(`Connection "${newName}" updated`, 'success');
-        }
-        
-        async function testConnection(name) {
-            const connections = getConnections();
-            const conn = connections[name];
-            if (!conn) return;
-            
-            showMessage(`Testing connection to "${name}"...`, 'info');
-            
-            // For now, show the connection details
-            // In a real implementation, this would call the backend API
-            try {
-                // Simulated test - in production, call API
-                const address = conn.type === 'cloud' ? conn.cloudUrl : `${conn.ssl ? 'https' : 'http'}://${conn.address}:${conn.port}`;
-                showMessage(`Connection "${name}" configuration valid. Server: ${address}`, 'success');
-            } catch (err) {
-                showMessage(`Connection test failed: ${err.message}`, 'error');
-            }
-        }
-        
-        // ============================================
-        // MDX Query Execution
-        // ============================================
-        
-        document.getElementById('executeBtn').addEventListener('click', async function() {
-            const instance = document.getElementById('queryInstance').value;
-            const mdx = document.getElementById('mdxQuery').value.trim();
+        // MDX Query
+        function executeQuery() {
+            var instance = document.getElementById('query-instance').value;
+            var mdx = document.getElementById('mdx-query').value.trim();
             
             if (!instance) {
                 showMessage('Please select a connection', 'error');
@@ -872,235 +659,108 @@ FROM [SalesCube]"></textarea>
                 return;
             }
             
-            const connections = getConnections();
-            const conn = connections[instance];
-            if (!conn) {
-                showMessage('Connection not found', 'error');
-                return;
-            }
+            document.getElementById('results-panel').style.display = 'block';
+            showStatus('query-status', '<span class="spinner"></span> Executing...', 'info');
+            document.getElementById('results-container').innerHTML = '<div class="empty"><span class="spinner"></span> Loading...</div>';
             
-            this.disabled = true;
-            this.innerHTML = '<span class="loading"></span> Executing...';
-            
-            try {
-                // Call the backend API
-                const response = await fetch(`${API_BASE}/instance/${instance}/query`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer demo-token' // Replace with actual auth
-                    },
-                    body: JSON.stringify({
-                        mdx: mdx,
-                        connection: conn // Pass connection details
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayResults(data.data);
-                    showMessage(`Query executed successfully. ${data.data.count} results.`, 'success');
-                } else {
-                    // Fallback: show demo results for testing
-                    displayDemoResults(mdx);
-                }
-            } catch (err) {
-                // Demo mode: show sample results
-                displayDemoResults(mdx);
-            } finally {
-                this.disabled = false;
-                this.innerHTML = 'Execute Query';
-            }
-        });
-        
-        function displayResults(data) {
-            const container = document.getElementById('queryResults');
-            const card = document.getElementById('resultsCard');
-            const countEl = document.getElementById('resultsCount');
-            
-            card.style.display = 'block';
-            
-            if (!data.results || data.results.length === 0) {
-                container.innerHTML = '<p style="padding: 1rem; color: var(--fg-dim);">No results returned</p>';
-                countEl.textContent = '0 rows';
-                return;
-            }
-            
-            const results = data.results;
-            let html = '<table class="results-table"><thead><tr>';
-            html += '<th>Ordinal</th><th>Value</th>';
-            html += '</tr></thead><tbody>';
-            
-            results.forEach(row => {
-                html += `<tr><td>${row.coordinates}</td><td>${row.value}</td></tr>`;
-            });
-            
-            html += '</tbody></table>';
-            container.innerHTML = html;
-            countEl.textContent = `${results.length} row${results.length !== 1 ? 's' : ''}`;
+            // Demo results
+            setTimeout(function() {
+                showStatus('query-status', 'Query executed (demo mode)', 'success');
+                renderDemoResults();
+            }, 500);
         }
         
-        function displayDemoResults(mdx) {
-            const container = document.getElementById('queryResults');
-            const card = document.getElementById('resultsCard');
-            
-            card.style.display = 'block';
-            
-            // Generate demo data based on MDX
-            const demoData = [
-                { dimension: 'Year', member: '2024', value: 1250000 },
-                { dimension: 'Year', member: '2025', value: 1450000 },
-                { dimension: 'Year', member: '2026', value: 1680000 },
+        function renderDemoResults() {
+            var demoData = [
+                { coords: ['2024', 'Sales', 'North'], value: 125000 },
+                { coords: ['2024', 'Sales', 'South'], value: 98000 },
+                { coords: ['2025', 'Sales', 'North'], value: 145000 },
+                { coords: ['2025', 'Sales', 'South'], value: 112000 },
+                { coords: ['2026', 'Sales', 'North'], value: 168000 },
+                { coords: ['2026', 'Sales', 'South'], value: 134000 }
             ];
             
-            let html = '<table class="results-table"><thead><tr>';
-            html += '<th>Dimension</th><th>Member</th><th>Value</th>';
-            html += '</tr></thead><tbody>';
+            document.getElementById('row-count').textContent = demoData.length + ' rows (demo data)';
             
-            demoData.forEach(row => {
-                html += `<tr><td>${row.dimension}</td><td>${row.member}</td><td>${row.value.toLocaleString()}</td></tr>`;
+            var html = '<table><thead><tr><th>Year</th><th>Measure</th><th>Region</th><th>Value</th></tr></thead><tbody>';
+            demoData.forEach(function(row) {
+                html += '<tr>';
+                row.coords.forEach(function(c) { html += '<td>' + c + '</td>'; });
+                html += '<td class="value-cell">' + row.value.toLocaleString() + '</td></tr>';
             });
-            
             html += '</tbody></table>';
-            container.innerHTML = html;
-            document.getElementById('resultsCount').textContent = `${demoData.length} rows (demo data)`;
-            showMessage('Demo mode: Showing sample results. Configure TM1 backend for real data.', 'info');
+            
+            document.getElementById('results-container').innerHTML = html;
         }
         
-        document.getElementById('clearQueryBtn').addEventListener('click', function() {
-            document.getElementById('mdxQuery').value = '';
-            document.getElementById('resultsCard').style.display = 'none';
-        });
+        function clearQuery() {
+            document.getElementById('mdx-query').value = '';
+            document.getElementById('results-panel').style.display = 'none';
+        }
         
-        // ============================================
+        function exportCsv() {
+            var table = document.querySelector('#results-container table');
+            if (!table) return;
+            
+            var csv = [];
+            table.querySelectorAll('tr').forEach(function(row) {
+                var cols = [];
+                row.querySelectorAll('td, th').forEach(function(cell) {
+                    cols.push('"' + cell.textContent + '"');
+                });
+                csv.push(cols.join(','));
+            });
+            
+            var blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'tm1_results.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
         // Cube Browser
-        // ============================================
-        
-        document.getElementById('loadCubesBtn').addEventListener('click', async function() {
-            const instance = document.getElementById('cubeInstance').value;
+        function loadCubes() {
+            var instance = document.getElementById('cube-instance').value;
             if (!instance) {
                 showMessage('Please select a connection', 'error');
                 return;
             }
             
-            this.disabled = true;
-            this.innerHTML = '<span class="loading"></span> Loading...';
+            // Demo cubes
+            var demoCubes = ['SalesCube', 'BudgetCube', 'ForecastCube', 'ActualsCube', 'VarianceCube', 'InventoryCube'];
             
-            try {
-                const response = await fetch(`${API_BASE}/instance/${instance}/cubes`, {
-                    headers: { 'Authorization': 'Bearer demo-token' }
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayCubeList(data.data.cubes);
-                } else {
-                    displayDemoCubes();
-                }
-            } catch (err) {
-                displayDemoCubes();
-            } finally {
-                this.disabled = false;
-                this.innerHTML = 'Load Cubes';
-            }
-        });
-        
-        function displayCubeList(cubes) {
-            const list = document.getElementById('cubeList');
-            document.getElementById('cubeCount').textContent = cubes.length;
+            document.getElementById('cubes-panel').style.display = 'block';
+            document.getElementById('cube-count').textContent = '(' + demoCubes.length + ')';
             
-            list.innerHTML = cubes.map(cube => `
-                <div class="connection-item" style="cursor: pointer;" onclick="loadCubeDetails('${cube}')">
-                    <div class="connection-info">
-                        <div class="connection-icon">&#128230;</div>
-                        <div class="connection-details">
-                            <h3>${cube}</h3>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+            var html = demoCubes.map(function(cube) {
+                return '<div class="cube-item" onclick="loadCubeDetails(\'' + cube + '\')">' + cube + '</div>';
+            }).join('');
+            
+            document.getElementById('cube-list').innerHTML = html;
+            showMessage('Loaded ' + demoCubes.length + ' cubes (demo mode)', 'info');
         }
         
-        function displayDemoCubes() {
-            const demoCubes = ['SalesCube', 'BudgetCube', 'ForecastCube', 'ActualsCube', 'VarianceCube'];
-            displayCubeList(demoCubes);
-            showMessage('Demo mode: Showing sample cubes', 'info');
+        function loadCubeDetails(cubeName) {
+            document.getElementById('cube-detail-title').textContent = cubeName;
+            
+            var demoDims = ['Account', 'Time', 'Region', 'Product', 'Scenario', 'Measures'];
+            
+            var html = demoDims.map(function(dim, i) {
+                return '<div class="dim-item"><span class="dim-num">' + (i + 1) + '</span><span>' + dim + '</span></div>';
+            }).join('');
+            
+            document.getElementById('cube-details').innerHTML = html;
         }
         
-        async function loadCubeDetails(cubeName) {
-            const instance = document.getElementById('cubeInstance').value;
-            document.getElementById('cubeDetailTitle').textContent = cubeName;
-            
-            const detailsEl = document.getElementById('cubeDetails');
-            detailsEl.innerHTML = '<div class="loading"></div> Loading dimensions...';
-            
-            try {
-                const response = await fetch(`${API_BASE}/instance/${instance}/cube/${cubeName}/dimensions`, {
-                    headers: { 'Authorization': 'Bearer demo-token' }
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayCubeDimensions(data.data.dimensions);
-                } else {
-                    displayDemoDimensions(cubeName);
-                }
-            } catch (err) {
-                displayDemoDimensions(cubeName);
-            }
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
-        function displayCubeDimensions(dimensions) {
-            const detailsEl = document.getElementById('cubeDetails');
-            detailsEl.innerHTML = `
-                <h4 style="margin-bottom: 1rem; color: var(--fg-dim); font-size: 0.85rem;">DIMENSIONS</h4>
-                ${dimensions.map((dim, i) => `
-                    <div class="connection-item" style="margin-bottom: 0.5rem;">
-                        <div class="connection-info">
-                            <span style="color: var(--accent); font-weight: bold; width: 24px;">${i + 1}</span>
-                            <span>${dim}</span>
-                        </div>
-                    </div>
-                `).join('')}
-            `;
-        }
-        
-        function displayDemoDimensions(cubeName) {
-            const demoDimensions = ['Account', 'Time', 'Region', 'Product', 'Measures'];
-            displayCubeDimensions(demoDimensions);
-        }
-        
-        // ============================================
-        // CSV Export
-        // ============================================
-        
-        document.getElementById('exportCsvBtn').addEventListener('click', function() {
-            const table = document.querySelector('.results-table');
-            if (!table) return;
-            
-            let csv = [];
-            const rows = table.querySelectorAll('tr');
-            
-            rows.forEach(row => {
-                const cols = row.querySelectorAll('td, th');
-                const rowData = Array.from(cols).map(col => `"${col.textContent}"`);
-                csv.push(rowData.join(','));
-            });
-            
-            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'tm1_query_results.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-        });
-        
-        // ============================================
-        // Initialize
-        // ============================================
-        
+        // Init
         renderConnections();
     </script>
 </body>

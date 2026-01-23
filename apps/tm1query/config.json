@@ -4,7 +4,6 @@
   "description": "TM1 MDX Query Tool - Configure connections and run MDX queries",
   "enabled": true,
   "prefix": "/tm1query",
-  "port": 8002,
   "auth_required": false,
   "settings": {
     "log_level": "INFO",

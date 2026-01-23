@@ -4,7 +4,6 @@
   "description": "TM1 Data API - Supports multiple TM1 instances (Cloud and On-Premise)",
   "enabled": true,
   "auth_required": true,
-  "port": 8001,
   "venv_path": ".venv",
   "settings": {
     "default_instance": "${TM1_DEFAULT_INSTANCE:-default}",

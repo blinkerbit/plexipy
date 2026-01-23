@@ -2,6 +2,12 @@
 # entrypoint.sh
 # Main entrypoint for PyRest Docker container
 # Starts isolated apps first, then the main PyRest server
+#
+# Air-gapped / Internal PyPI Proxy Support:
+#   Set these environment variables in docker-compose.yml:
+#   - PIP_INDEX_URL: https://pypi.internal.company.com/simple/
+#   - PIP_TRUSTED_HOST: pypi.internal.company.com
+#   (uv automatically uses PIP_INDEX_URL - no separate config needed)
 
 set -e
 
@@ -9,6 +15,11 @@ APPS_FOLDER="${PYREST_APPS_FOLDER:-/app/apps}"
 BASE_PORT="${PYREST_ISOLATED_BASE_PORT:-8001}"
 BASE_PATH="${PYREST_BASE_PATH:-/pyrest}"
 RUNNER_SCRIPT="/app/pyrest/templates/isolated_app.py"
+
+# PyPI proxy settings (for air-gapped environments)
+# Both pip and uv respect these env vars automatically:
+#   - PIP_INDEX_URL
+#   - PIP_TRUSTED_HOST
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════╗"
@@ -60,8 +71,14 @@ start_isolated_app() {
         fi
     fi
     
-    # Install requirements
+    # Install requirements (supports internal PyPI proxy for air-gapped environments)
+    # Both pip and uv respect PIP_INDEX_URL and PIP_TRUSTED_HOST env vars
     echo "Installing requirements..."
+    
+    if [ -n "$PIP_INDEX_URL" ]; then
+        echo "  Using PyPI index: $PIP_INDEX_URL"
+    fi
+    
     if command -v uv &> /dev/null; then
         uv pip install --python "$python_exe" -r "$requirements_file" 2>&1 | tail -5
     else
@@ -96,7 +113,8 @@ current_port=$BASE_PORT
 isolated_count=0
 
 if [ -d "$APPS_FOLDER" ]; then
-    for app_dir in "$APPS_FOLDER"/*/; do
+    # Sort apps alphabetically to ensure consistent port assignment with Python
+    for app_dir in $(find "$APPS_FOLDER" -mindepth 1 -maxdepth 1 -type d | sort); do
         [ -d "$app_dir" ] || continue
         
         requirements_file="$app_dir/requirements.txt"

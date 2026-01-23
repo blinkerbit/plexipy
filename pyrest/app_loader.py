@@ -165,7 +165,8 @@ class AppLoader:
             self.apps_folder.mkdir(parents=True, exist_ok=True)
             return apps
         
-        for item in self.apps_folder.iterdir():
+        # Sort directories alphabetically for consistent port assignment
+        for item in sorted(self.apps_folder.iterdir(), key=lambda x: x.name):
             if item.is_dir() and not item.name.startswith("_"):
                 config_file = item / "config.json"
                 

@@ -1,0 +1,54 @@
+{
+    "_comment": "Central TM1 Connection Configuration for PyRest",
+    "_usage": "Use get_tm1_instance('instance_name') to connect",
+    
+    "instances": {
+        "default": {
+            "description": "Default TM1 instance",
+            "connection_type": "onprem",
+            "server": "localhost",
+            "port": 8001,
+            "ssl": false,
+            "user": "admin",
+            "password": "${TM1_DEFAULT_PASSWORD:-}"
+        },
+        
+        "production": {
+            "description": "Production TM1 Server",
+            "connection_type": "onprem",
+            "server": "${TM1_PROD_SERVER:-tm1prod.company.com}",
+            "port": 8010,
+            "ssl": true,
+            "user": "${TM1_PROD_USER:-admin}",
+            "password": "${TM1_PROD_PASSWORD:-}",
+            "namespace": ""
+        },
+        
+        "development": {
+            "description": "Development TM1 Server",
+            "connection_type": "onprem",
+            "server": "localhost",
+            "port": 8001,
+            "ssl": false,
+            "user": "admin",
+            "password": ""
+        },
+        
+        "cloud_example": {
+            "description": "IBM Planning Analytics Cloud (example)",
+            "connection_type": "cloud",
+            "cloud_region": "us-east-1",
+            "cloud_tenant": "${TM1_CLOUD_TENANT:-}",
+            "cloud_api_key": "${TM1_CLOUD_API_KEY:-}",
+            "instance": ""
+        }
+    },
+    
+    "settings": {
+        "default_instance": "default",
+        "session_context": "PyRest App",
+        "connection_timeout": 30,
+        "retry_on_failure": true,
+        "max_retries": 3
+    }
+}
