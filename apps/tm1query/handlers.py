@@ -4,6 +4,13 @@ TM1 MDX Query Tool for PyRest framework.
 This is an ISOLATED app - it runs in its own process with TM1py installed
 because it has a requirements.txt file.
 
+Targets TM1 v12 as the primary connection type.
+
+TM1 v12 Connection Types (Primary Target):
+- v12: TM1 v12 with basic authentication (RECOMMENDED)
+- v12_azure_ad: TM1 v12 with Azure AD OAuth2 authentication
+- v12_paas: IBM Planning Analytics as a Service (TM1 v12)
+
 URL prefix: /pyrest/tm1query
 
 Endpoints:
@@ -111,11 +118,100 @@ class TM1QueryBaseHandler(tornado.web.RequestHandler):
         return value
     
     def _build_connection_params(self, instance_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Build TM1Service connection parameters from config."""
-        conn_type = self._resolve_env(instance_config.get("connection_type", "onprem"))
+        """
+        Build TM1Service connection parameters from config.
         
-        if conn_type.lower() in ("cloud", "paas"):
-            # Cloud connection
+        Supports TM1 v12 connection types as the primary target:
+        - v12: TM1 v12 with basic authentication
+        - v12_azure_ad: TM1 v12 with Azure AD OAuth2 authentication
+        - v12_paas: IBM Planning Analytics as a Service (TM1 v12)
+        
+        Also supports legacy connection types for backward compatibility.
+        """
+        conn_type = self._resolve_env(instance_config.get("connection_type", "v12"))
+        
+        # TM1 v12 with basic authentication (primary target)
+        if conn_type.lower() == "v12":
+            params = {
+                "base_url": self._resolve_env(instance_config.get("base_url", "")),
+                "user": self._resolve_env(instance_config.get("user", "")),
+                "password": self._resolve_env(instance_config.get("password", "")),
+                "ssl": self._resolve_env(instance_config.get("ssl", True)),
+            }
+            
+            # Optional v12 parameters
+            instance = self._resolve_env(instance_config.get("instance", ""))
+            database = self._resolve_env(instance_config.get("database", ""))
+            if instance:
+                params["instance"] = instance
+            if database:
+                params["database"] = database
+            
+            # Handle boolean ssl
+            if isinstance(params["ssl"], str):
+                params["ssl"] = params["ssl"].lower() in ("true", "1", "yes")
+            
+            # SSL certificate verification
+            if not self._resolve_env(instance_config.get("verify_ssl_cert", True)):
+                params["verify"] = False
+            
+            return params
+        
+        # TM1 v12 with Azure AD authentication
+        elif conn_type.lower() == "v12_azure_ad":
+            params = {
+                "base_url": self._resolve_env(instance_config.get("base_url", "")),
+                "tenant": self._resolve_env(instance_config.get("tenant_id", "")),
+                "client_id": self._resolve_env(instance_config.get("client_id", "")),
+                "client_secret": self._resolve_env(instance_config.get("client_secret", "")),
+                "ssl": True,
+            }
+            
+            # Custom auth URL if provided
+            auth_url = self._resolve_env(instance_config.get("auth_url", ""))
+            if auth_url:
+                params["auth_url"] = auth_url
+            
+            # Optional v12 parameters
+            instance = self._resolve_env(instance_config.get("instance", ""))
+            database = self._resolve_env(instance_config.get("database", ""))
+            if instance:
+                params["instance"] = instance
+            if database:
+                params["database"] = database
+            
+            return params
+        
+        # TM1 v12 PAaaS (IBM Planning Analytics as a Service)
+        elif conn_type.lower() == "v12_paas":
+            params = {
+                "base_url": self._resolve_env(instance_config.get("base_url", "")),
+                "api_key": self._resolve_env(instance_config.get("api_key", "")),
+                "ssl": True,
+            }
+            
+            # IBM IAM URL
+            iam_url = self._resolve_env(instance_config.get("iam_url", ""))
+            if iam_url:
+                params["iam_url"] = iam_url
+            
+            # Tenant for PAaaS
+            tenant = self._resolve_env(instance_config.get("tenant", ""))
+            if tenant:
+                params["tenant"] = tenant
+            
+            # Optional v12 parameters
+            instance = self._resolve_env(instance_config.get("instance", ""))
+            database = self._resolve_env(instance_config.get("database", ""))
+            if instance:
+                params["instance"] = instance
+            if database:
+                params["database"] = database
+            
+            return params
+        
+        # Legacy cloud connection
+        elif conn_type.lower() in ("cloud", "paas"):
             region = self._resolve_env(instance_config.get("cloud_region", ""))
             tenant = self._resolve_env(instance_config.get("cloud_tenant", ""))
             return {
@@ -125,8 +221,9 @@ class TM1QueryBaseHandler(tornado.web.RequestHandler):
                 "tenant": tenant,
                 "ssl": True,
             }
+        
+        # Legacy on-premise connection (pre-v12)
         else:
-            # On-premise connection
             params = {
                 "address": self._resolve_env(instance_config.get("server", "localhost")),
                 "port": int(self._resolve_env(instance_config.get("port", 8010))),

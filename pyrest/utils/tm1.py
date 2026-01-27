@@ -1,9 +1,17 @@
 """
 TM1 Connection Utilities for PyRest Framework.
 
-Provides connection management for multiple TM1 instances supporting both:
-- TM1 On-Premise (traditional TM1 servers)
-- TM1 Cloud (IBM Planning Analytics as a Service)
+Provides connection management for multiple TM1 instances supporting:
+- TM1 v12 (primary target - latest version)
+- TM1 v12 with Azure AD authentication
+- TM1 v12 PAaaS (IBM Planning Analytics as a Service)
+- TM1 On-Premise (legacy, for backward compatibility)
+- TM1 Cloud (legacy, for backward compatibility)
+
+TM1 v12 Connection Types:
+- v12: TM1 v12 with basic authentication
+- v12_azure_ad: TM1 v12 with Azure AD OAuth2 authentication
+- v12_paas: IBM Planning Analytics as a Service (TM1 v12)
 
 Simple Usage (Recommended):
     from pyrest.utils.tm1 import get_tm1_instance
@@ -129,17 +137,38 @@ class TM1InstanceConfig:
         except (ValueError, TypeError):
             return default
     
+    def is_v12(self) -> bool:
+        """Check if this is a TM1 v12 instance (any v12 connection type)."""
+        return self.connection_type.startswith("v12")
+    
+    def is_v12_azure_ad(self) -> bool:
+        """Check if this is a TM1 v12 instance with Azure AD authentication."""
+        return self.connection_type == "v12_azure_ad"
+    
+    def is_v12_paas(self) -> bool:
+        """Check if this is a TM1 v12 PAaaS instance."""
+        return self.connection_type == "v12_paas"
+    
     def is_cloud(self) -> bool:
-        """Check if this is a cloud instance."""
-        return self.connection_type in ("cloud", "paas")
+        """Check if this is a cloud instance (legacy or v12 PAaaS)."""
+        return self.connection_type in ("cloud", "paas", "v12_paas")
     
     def is_onprem(self) -> bool:
-        """Check if this is an on-premise instance."""
-        return not self.is_cloud()
+        """Check if this is a legacy on-premise instance."""
+        return self.connection_type == "onprem"
     
     def build_connection_params(self, session_context: str = "PyRest TM1 App") -> Dict[str, Any]:
         """
         Build TM1py connection parameters for this instance.
+        
+        Supports TM1 v12 connection types as the primary target:
+        - v12: TM1 v12 with basic authentication
+        - v12_azure_ad: TM1 v12 with Azure AD OAuth2 authentication  
+        - v12_paas: IBM Planning Analytics as a Service (TM1 v12)
+        
+        Also supports legacy connection types for backward compatibility:
+        - onprem: Traditional TM1 on-premise servers
+        - cloud: Legacy IBM Planning Analytics Cloud
         
         Args:
             session_context: Session context string for TM1 server
@@ -147,13 +176,131 @@ class TM1InstanceConfig:
         Returns:
             Dictionary of parameters for TM1Service constructor
         """
-        if self.is_cloud():
+        # TM1 v12 connection types (primary target)
+        if self.connection_type == "v12":
+            return self._build_v12_params(session_context)
+        elif self.connection_type == "v12_azure_ad":
+            return self._build_v12_azure_ad_params(session_context)
+        elif self.connection_type == "v12_paas":
+            return self._build_v12_paas_params(session_context)
+        # Legacy connection types (backward compatibility)
+        elif self.is_cloud():
             return self._build_cloud_params(session_context)
         else:
             return self._build_onprem_params(session_context)
     
+    def _build_v12_params(self, session_context: str) -> Dict[str, Any]:
+        """
+        Build connection parameters for TM1 v12 with basic authentication.
+        
+        TM1 v12 uses base_url instead of address/port, and may include
+        instance and database in the URL structure.
+        """
+        params = {
+            "base_url": self.get("base_url", ""),
+            "user": self.get("user", ""),
+            "password": self.get("password", ""),
+            "ssl": self.get_bool("ssl", True),
+            "session_context": session_context,
+        }
+        
+        # Optional TM1 v12 specific parameters
+        instance = self.get("instance", "")
+        database = self.get("database", "")
+        if instance:
+            params["instance"] = instance
+        if database:
+            params["database"] = database
+        
+        # SSL certificate verification (v12 often uses self-signed certs)
+        if not self.get_bool("verify_ssl_cert", True):
+            params["verify"] = False
+        
+        logger.debug(f"Instance {self.name}: Using TM1 v12 with basic authentication")
+        return params
+    
+    def _build_v12_azure_ad_params(self, session_context: str) -> Dict[str, Any]:
+        """
+        Build connection parameters for TM1 v12 with Azure AD authentication.
+        
+        Uses OAuth2 client credentials flow to acquire access token.
+        """
+        params = {
+            "base_url": self.get("base_url", ""),
+            "ssl": True,
+            "session_context": session_context,
+        }
+        
+        # Azure AD authentication parameters
+        tenant_id = self.get("tenant_id", "")
+        client_id = self.get("client_id", "")
+        client_secret = self.get("client_secret", "")
+        
+        if tenant_id and client_id and client_secret:
+            params["tenant"] = tenant_id
+            params["client_id"] = client_id
+            params["client_secret"] = client_secret
+            
+            # Custom auth URL if provided
+            auth_url = self.get("auth_url", "")
+            if auth_url:
+                params["auth_url"] = auth_url
+        
+        # Optional TM1 v12 specific parameters
+        instance = self.get("instance", "")
+        database = self.get("database", "")
+        if instance:
+            params["instance"] = instance
+        if database:
+            params["database"] = database
+        
+        # SSL certificate verification
+        if not self.get_bool("verify_ssl_cert", True):
+            params["verify"] = False
+        
+        logger.debug(f"Instance {self.name}: Using TM1 v12 with Azure AD authentication")
+        return params
+    
+    def _build_v12_paas_params(self, session_context: str) -> Dict[str, Any]:
+        """
+        Build connection parameters for TM1 v12 Planning Analytics as a Service.
+        
+        PAaaS uses IBM IAM authentication with API key.
+        """
+        params = {
+            "base_url": self.get("base_url", ""),
+            "api_key": self.get("api_key", ""),
+            "ssl": True,
+            "session_context": session_context,
+        }
+        
+        # IBM IAM URL
+        iam_url = self.get("iam_url", "")
+        if iam_url:
+            params["iam_url"] = iam_url
+        
+        # Tenant for PAaaS
+        tenant = self.get("tenant", "")
+        if tenant:
+            params["tenant"] = tenant
+        
+        # TM1 v12 specific parameters
+        instance = self.get("instance", "")
+        database = self.get("database", "")
+        if instance:
+            params["instance"] = instance
+        if database:
+            params["database"] = database
+        
+        logger.debug(f"Instance {self.name}: Using TM1 v12 PAaaS with IBM IAM authentication")
+        return params
+    
     def _build_onprem_params(self, session_context: str) -> Dict[str, Any]:
-        """Build connection parameters for TM1 On-Premise."""
+        """
+        Build connection parameters for legacy TM1 On-Premise (pre-v12).
+        
+        Kept for backward compatibility with older TM1 installations.
+        """
         params = {
             "address": self.get("server", "localhost"),
             "port": self.get_int("port", 8010),
@@ -168,12 +315,12 @@ class TM1InstanceConfig:
         
         if integrated_login:
             params["integrated_login"] = True
-            logger.debug(f"Instance {self.name}: Using Windows Integrated Authentication")
+            logger.debug(f"Instance {self.name}: Using Windows Integrated Authentication (legacy on-prem)")
         elif cam_passport:
             params["cam_passport"] = cam_passport
             if namespace:
                 params["namespace"] = namespace
-            logger.debug(f"Instance {self.name}: Using CAM Passport Authentication")
+            logger.debug(f"Instance {self.name}: Using CAM Passport Authentication (legacy on-prem)")
         elif namespace:
             params["user"] = self.get("user", "")
             params["password"] = self.get("password", "")
@@ -181,16 +328,21 @@ class TM1InstanceConfig:
             gateway = self.get("gateway", "")
             if gateway:
                 params["gateway"] = gateway
-            logger.debug(f"Instance {self.name}: Using CAM Authentication")
+            logger.debug(f"Instance {self.name}: Using CAM Authentication (legacy on-prem)")
         else:
             params["user"] = self.get("user", "")
             params["password"] = self.get("password", "")
-            logger.debug(f"Instance {self.name}: Using Basic TM1 Authentication")
+            logger.debug(f"Instance {self.name}: Using Basic TM1 Authentication (legacy on-prem)")
         
         return params
     
     def _build_cloud_params(self, session_context: str) -> Dict[str, Any]:
-        """Build connection parameters for TM1 Cloud (IBM Planning Analytics as a Service)."""
+        """
+        Build connection parameters for legacy TM1 Cloud (IBM Planning Analytics).
+        
+        Note: For TM1 v12 PAaaS, use connection_type 'v12_paas' instead.
+        This is kept for backward compatibility.
+        """
         region = self.get("cloud_region", "")
         tenant = self.get("cloud_tenant", "")
         
@@ -207,7 +359,7 @@ class TM1InstanceConfig:
         if instance:
             params["instance"] = instance
         
-        logger.debug(f"Instance {self.name}: Using TM1 Cloud (region: {region})")
+        logger.debug(f"Instance {self.name}: Using legacy TM1 Cloud (region: {region}) - consider migrating to v12_paas")
         return params
     
     def to_dict(self, include_sensitive: bool = False) -> Dict[str, Any]:
@@ -220,27 +372,56 @@ class TM1InstanceConfig:
         Returns:
             Dictionary representation of the instance
         """
-        if self.is_cloud():
+        base_info = {
+            "name": self.name,
+            "description": self.description,
+            "connection_type": self.connection_type,
+            "is_v12": self.is_v12(),
+        }
+        
+        if self.connection_type == "v12":
             info = {
-                "name": self.name,
-                "description": self.description,
-                "connection_type": "cloud",
+                **base_info,
+                "base_url": self.get("base_url", ""),
+                "instance": self.get("instance", ""),
+                "database": self.get("database", ""),
+                "ssl": self.get_bool("ssl", True),
+            }
+        elif self.connection_type == "v12_azure_ad":
+            info = {
+                **base_info,
+                "base_url": self.get("base_url", ""),
+                "instance": self.get("instance", ""),
+                "database": self.get("database", ""),
+                "tenant_id": self.get("tenant_id", ""),
+                "auth_type": "azure_ad",
+            }
+        elif self.connection_type == "v12_paas":
+            info = {
+                **base_info,
+                "base_url": self.get("base_url", ""),
+                "iam_url": self.get("iam_url", ""),
+                "tenant": self.get("tenant", ""),
+                "instance": self.get("instance", ""),
+                "database": self.get("database", ""),
+            }
+        elif self.connection_type in ("cloud", "paas"):
+            info = {
+                **base_info,
                 "cloud_region": self.get("cloud_region", ""),
                 "cloud_tenant": self.get("cloud_tenant", ""),
                 "instance": self.get("instance", ""),
             }
-        else:
+        else:  # onprem (legacy)
             info = {
-                "name": self.name,
-                "description": self.description,
-                "connection_type": "onprem",
+                **base_info,
                 "server": self.get("server", "localhost"),
                 "port": self.get_int("port", 8010),
                 "ssl": self.get_bool("ssl", True),
             }
         
         if include_sensitive:
-            if not self.is_cloud():
+            if self.connection_type in ("v12", "onprem"):
                 info["user"] = self.get("user", "")
         
         return info

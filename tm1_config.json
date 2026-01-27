@@ -1,46 +1,68 @@
 {
-    "_comment": "Central TM1 Connection Configuration for PyRest",
+    "_comment": "Central TM1 Connection Configuration for PyRest - Targeting TM1 v12",
     "_usage": "Use get_tm1_instance('instance_name') to connect",
+    "_version": "TM1 v12 compatible",
     
     "instances": {
         "default": {
-            "description": "Default TM1 instance",
-            "connection_type": "onprem",
-            "server": "localhost",
-            "port": 8001,
-            "ssl": false,
+            "description": "Default TM1 v12 instance",
+            "connection_type": "v12",
+            "base_url": "${TM1_DEFAULT_BASE_URL:-https://localhost:8010/api/v1}",
+            "instance": "${TM1_DEFAULT_INSTANCE:-}",
+            "database": "${TM1_DEFAULT_DATABASE:-}",
+            "ssl": true,
             "user": "admin",
-            "password": "${TM1_DEFAULT_PASSWORD:-}"
+            "password": "${TM1_DEFAULT_PASSWORD:-}",
+            "verify_ssl_cert": false
         },
         
         "production": {
-            "description": "Production TM1 Server",
-            "connection_type": "onprem",
-            "server": "${TM1_PROD_SERVER:-tm1prod.company.com}",
-            "port": 8010,
+            "description": "Production TM1 v12 Server",
+            "connection_type": "v12_azure_ad",
+            "base_url": "${TM1_PROD_BASE_URL:-https://tm1prod.company.com/api/v1}",
+            "instance": "${TM1_PROD_INSTANCE:-}",
+            "database": "${TM1_PROD_DATABASE:-}",
+            "tenant_id": "${TM1_PROD_TENANT_ID:-}",
+            "client_id": "${TM1_PROD_CLIENT_ID:-}",
+            "client_secret": "${TM1_PROD_CLIENT_SECRET:-}",
+            "auth_url": "${TM1_PROD_AUTH_URL:-}",
             "ssl": true,
-            "user": "${TM1_PROD_USER:-admin}",
-            "password": "${TM1_PROD_PASSWORD:-}",
-            "namespace": ""
+            "verify_ssl_cert": true
         },
         
         "development": {
-            "description": "Development TM1 Server",
+            "description": "Development TM1 v12 Server",
+            "connection_type": "v12",
+            "base_url": "${TM1_DEV_BASE_URL:-https://localhost:8010/api/v1}",
+            "instance": "${TM1_DEV_INSTANCE:-}",
+            "database": "${TM1_DEV_DATABASE:-}",
+            "ssl": true,
+            "user": "admin",
+            "password": "${TM1_DEV_PASSWORD:-}",
+            "verify_ssl_cert": false
+        },
+        
+        "cloud_paas": {
+            "description": "IBM Planning Analytics as a Service (PAaaS) - TM1 v12",
+            "connection_type": "v12_paas",
+            "base_url": "${TM1_PAAS_BASE_URL:-}",
+            "iam_url": "${TM1_PAAS_IAM_URL:-https://iam.cloud.ibm.com}",
+            "tenant": "${TM1_PAAS_TENANT:-}",
+            "instance": "${TM1_PAAS_INSTANCE:-}",
+            "database": "${TM1_PAAS_DATABASE:-}",
+            "api_key": "${TM1_PAAS_API_KEY:-}",
+            "ssl": true
+        },
+        
+        "legacy_onprem": {
+            "description": "Legacy TM1 On-Premise (pre-v12) - for backward compatibility",
             "connection_type": "onprem",
-            "server": "localhost",
+            "server": "${TM1_LEGACY_SERVER:-localhost}",
             "port": 8001,
             "ssl": false,
             "user": "admin",
-            "password": ""
-        },
-        
-        "cloud_example": {
-            "description": "IBM Planning Analytics Cloud (example)",
-            "connection_type": "cloud",
-            "cloud_region": "us-east-1",
-            "cloud_tenant": "${TM1_CLOUD_TENANT:-}",
-            "cloud_api_key": "${TM1_CLOUD_API_KEY:-}",
-            "instance": ""
+            "password": "${TM1_LEGACY_PASSWORD:-}",
+            "namespace": ""
         }
     },
     
@@ -49,6 +71,8 @@
         "session_context": "PyRest App",
         "connection_timeout": 30,
         "retry_on_failure": true,
-        "max_retries": 3
+        "max_retries": 3,
+        "tm1_version": "12",
+        "prefer_v12_connections": true
     }
 }

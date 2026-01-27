@@ -4,8 +4,17 @@ TM1 Data API - Multi-instance TM1 connector for PyRest framework.
 This is an ISOLATED app - it runs as a separate process with its own
 virtual environment because it HAS a requirements.txt file.
 
-Supports multiple TM1 instances - both TM1 Cloud (IBM Planning Analytics) 
-and TM1 On-Premise connections configured via config.json.
+Targets TM1 v12 as the primary connection type. Supports multiple TM1 instances
+configured via config.json or tm1_config.json.
+
+TM1 v12 Connection Types (Primary Target):
+- v12: TM1 v12 with basic authentication (RECOMMENDED)
+- v12_azure_ad: TM1 v12 with Azure AD OAuth2 authentication
+- v12_paas: IBM Planning Analytics as a Service (TM1 v12)
+
+Legacy Connection Types (Backward Compatibility):
+- cloud: Legacy IBM Planning Analytics Cloud
+- onprem: Legacy TM1 On-Premise (pre-v12)
 
 URL prefix: /pyrest/tm1data (based on the app name in config.json)
 
