@@ -1,12 +1,14 @@
-# Build Docker images for PyRest (Windows PowerShell)
+# Build Docker image for PyRest (Windows PowerShell)
+# Single Alpine container with Python + Nginx
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "Building PyRest Docker Images" -ForegroundColor Cyan
+Write-Host "Building PyRest Docker Image" -ForegroundColor Cyan
+Write-Host "(Alpine Python + Nginx)" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 # Build main PyRest image
 Write-Host ""
-Write-Host "Building main PyRest image..." -ForegroundColor Yellow
+Write-Host "Building PyRest unified image..." -ForegroundColor Yellow
 docker build -t pyrest:latest -f Dockerfile .
 
 if ($LASTEXITCODE -eq 0) {

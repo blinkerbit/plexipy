@@ -1,15 +1,17 @@
 #!/bin/bash
-# Build Docker images for PyRest
+# Build Docker image for PyRest
+# Single Alpine container with Python + Nginx
 
 set -e
 
 echo "=========================================="
-echo "Building PyRest Docker Images"
+echo "Building PyRest Docker Image"
+echo "(Alpine Python + Nginx)"
 echo "=========================================="
 
 # Build main PyRest image
 echo ""
-echo "Building main PyRest image..."
+echo "Building PyRest unified image..."
 docker build -t pyrest:latest -f Dockerfile .
 
 echo ""

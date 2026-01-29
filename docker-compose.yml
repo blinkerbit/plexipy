@@ -1,5 +1,6 @@
 # PyRest Framework Docker Compose Configuration
-# 
+# Single Container with Python + Nginx (Alpine-based)
+#
 # Usage:
 #   docker-compose up -d              # Start all services
 #   docker-compose up -d --build      # Rebuild and start
@@ -18,7 +19,8 @@ version: '3.8'
 
 services:
   # =========================================================================
-  # Main PyRest Server
+  # Main PyRest Server with Embedded Nginx
+  # Single Alpine container running both Python app and Nginx
   # =========================================================================
   pyrest:
     build:
@@ -31,6 +33,10 @@ services:
     container_name: pyrest-main
     restart: unless-stopped
     ports:
+      # Nginx (reverse proxy)
+      - "80:80"
+      - "443:443"
+      # PyRest API (direct access - optional, can remove if only using nginx)
       - "8000:8000"
     environment:
       - PYREST_HOST=0.0.0.0
@@ -53,22 +59,24 @@ services:
       # Mount config files
       - ./config.json:/app/config.json:ro
       - ./auth_config.json:/app/auth_config.json:ro
-      # Nginx config output
+      # Nginx config output (for generated configs)
       - ./nginx:/app/nginx
+      # SSL certificates (uncomment for HTTPS)
+      # - ./nginx/ssl:/etc/nginx/ssl:ro
       # Logs
       - pyrest-logs:/app/logs
     networks:
       - pyrest-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/pyrest/health')"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/nginx-health" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-
+      start_period: 15s
   # =========================================================================
   # Example Isolated App: TM1 Data API
-  # Uncomment to run as separate container
+  # Uncomment to run as separate container (for scaling/isolation)
+  # Note: When using unified container, isolated apps run inside pyrest container
   # =========================================================================
   # tm1data:
   #   build:
@@ -94,31 +102,6 @@ services:
   #     - pyrest
 
   # =========================================================================
-  # Nginx Reverse Proxy
-  # =========================================================================
-  nginx:
-    image: nginx:1.21.6-alpine
-    container_name: pyrest-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/docker-nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/pyrest_generated.conf:/etc/nginx/conf.d/pyrest.conf:ro
-      # SSL certificates (uncomment for HTTPS)
-      # - ./nginx/ssl:/etc/nginx/ssl:ro
-    networks:
-      - pyrest-network
-    depends_on:
-      - pyrest
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/nginx-health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # =========================================================================
   # Redis (Optional - for session storage / caching)
   # =========================================================================
   # redis:
@@ -133,9 +116,9 @@ services:
   #     - pyrest-network
   #   command: redis-server --appendonly yes
 
-# =============================================================================
-# Networks
-# =============================================================================
+  # =============================================================================
+  # Networks
+  # =============================================================================
 networks:
   pyrest-network:
     driver: bridge

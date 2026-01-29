@@ -217,10 +217,12 @@ class NginxGenerator:
             full_path = f"{base_path}{prefix}"
             # Use regex to match both /pyrest/app and /pyrest/app/...
             # This ensures requests work with or without trailing slash
+            # Important: When using regex location, we need to pass the full URI
+            # Using $request_uri preserves the original request path
             lines.extend([
                 f"    # Isolated app: {app.name}",
                 f"    location ~ ^{full_path}(/.*)?$ {{",
-                f"        proxy_pass http://pyrest_{app.name};",
+                f"        proxy_pass http://pyrest_{app.name}$request_uri;",
                 "    }",
                 ""
             ])
