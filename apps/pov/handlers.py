@@ -34,7 +34,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 # Import TM1 operations
-from . import tm1_operations as tm1_ops
+from tm1_operations import tm1_ops
 
 # Thread pool for async TM1 operations (TM1py is blocking)
 TM1_EXECUTOR = ThreadPoolExecutor(max_workers=16)
