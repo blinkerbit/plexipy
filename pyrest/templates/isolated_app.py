@@ -337,11 +337,17 @@ def main():
         logger.error(f"App path does not exist: {app_path}")
         sys.exit(1)
 
-    # Add app path to sys.path
+    # Add app path to sys.path so app modules can be imported
     if str(app_path) not in sys.path:
         sys.path.insert(0, str(app_path))
     if str(app_path.parent) not in sys.path:
         sys.path.insert(0, str(app_path.parent))
+
+    # Add the project root (/app in Docker) so apps can import pyrest.*
+    # The script lives at <root>/pyrest/templates/isolated_app.py -> root is 2 levels up
+    project_root = str(Path(__file__).resolve().parent.parent.parent)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
 
     # Create application
     app = create_application(app_path, base_path, app_name)
