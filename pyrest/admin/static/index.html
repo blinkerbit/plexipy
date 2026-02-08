@@ -638,7 +638,7 @@
             return html;
         }
 
-        function renderIsolatedActions(name, isRunning) {
+        function renderIsolatedActions(name, isRunning, venv) {
             var html = '<div class="actions">';
             if (isRunning) {
                 html += '<button class="action-btn danger" onclick="controlApp(\'' + name + '\', \'stop\')">Stop</button>';
@@ -646,8 +646,15 @@
             } else {
                 html += '<button class="action-btn success" onclick="controlApp(\'' + name + '\', \'start\')">Start</button>';
             }
-            html += '<button class="action-btn warn" onclick="confirmClearVenv(\'' + name + '\')">Clear Venv</button>';
-            html += '<button class="action-btn primary" onclick="confirmRebuild(\'' + name + '\')">Rebuild</button>';
+
+            // Venv lifecycle controls
+            var venvExists = venv && venv.exists;
+            if (venvExists) {
+                html += '<button class="action-btn danger" onclick="confirmDeleteVenv(\'' + name + '\')">Delete .venv</button>';
+            } else {
+                html += '<button class="action-btn success" onclick="confirmCreateVenv(\'' + name + '\')">Create .venv</button>';
+            }
+            html += '<button class="action-btn primary" onclick="confirmRebuild(\'' + name + '\')">Rebuild .venv</button>';
             html += '</div>';
             return html;
         }
@@ -709,7 +716,7 @@
                     '<td>' + statusBadge + renderProcessInfo(proc) + '</td>' +
                     '<td>' + renderVenvInfo(app.venv) + '</td>' +
                     '<td id="' + healthId + '">' + healthBadge(null) + '</td>' +
-                    '<td>' + renderIsolatedActions(app.name, isRunning) + '</td>' +
+                    '<td>' + renderIsolatedActions(app.name, isRunning, app.venv) + '</td>' +
                     '</tr>');
             });
 
@@ -831,17 +838,25 @@
                 });
         }
 
-        function confirmClearVenv(name) {
+        function confirmDeleteVenv(name) {
             showConfirm(
-                'Clear Virtual Environment',
-                'This will stop "' + name + '" (if running) and delete its .venv directory. You will need to rebuild before starting again.',
+                'Delete .venv',
+                'This will stop "' + name + '" (if running) and delete its .venv directory. The app cannot run until a new .venv is created.',
                 function() { controlApp(name, 'clear-venv'); }
+            );
+        }
+
+        function confirmCreateVenv(name) {
+            showConfirm(
+                'Create .venv',
+                'This will create a fresh virtual environment for "' + name + '" and install its dependencies. The app will NOT be started automatically.',
+                function() { controlApp(name, 'create-venv'); }
             );
         }
 
         function confirmRebuild(name) {
             showConfirm(
-                'Rebuild Virtual Environment',
+                'Rebuild .venv',
                 'This will stop "' + name + '", delete .venv, create a fresh one, install dependencies, and restart the app. This may take a minute.',
                 function() { controlApp(name, 'rebuild-venv'); }
             );

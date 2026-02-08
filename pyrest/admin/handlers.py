@@ -363,6 +363,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
       - stop:          Stop app (kills parent + all forked worker processes)
       - restart:       Stop + start
       - clear-venv:    Stop app if running, then delete .venv directory
+      - create-venv:   Create .venv and install deps (does NOT start the app)
       - rebuild-venv:  Stop app, delete .venv, create fresh .venv, install deps, start app
       - processes:     Return detailed process tree (parent + worker PIDs)
       - venv-status:   Return venv info (exists, valid, size)
@@ -388,6 +389,8 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
             await self._action_restart(app_name, app)
         elif action == "clear-venv":
             await self._action_clear_venv(app_name, app)
+        elif action == "create-venv":
+            await self._action_create_venv(app_name, app)
         elif action == "rebuild-venv":
             await self._action_rebuild_venv(app_name, app)
         elif action == "processes":
@@ -485,6 +488,31 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
         else:
             logger.error(f"Failed to clear venv for {app_name}: {msg}")
             self.error(f"Failed to clear venv: {msg}", 500)
+
+    async def _action_create_venv(self, app_name, app) -> None:
+        """Create .venv and install dependencies (does NOT start the app)."""
+        from ..venv_manager import get_venv_manager
+
+        venv_manager = get_venv_manager()
+        venv_path = Path(app.path) / ".venv"
+
+        if venv_path.exists():
+            self.success(
+                message=f"Venv already exists for '{app_name}'",
+                data={"venv": _get_venv_info(app.path), "created": False},
+            )
+            return
+
+        success, new_venv_path, msg = await venv_manager.ensure_venv(app.path)
+        if success:
+            logger.info(f"Created venv for {app_name}: {new_venv_path}")
+            self.success(
+                message=f"Venv created for '{app_name}'",
+                data={"venv": _get_venv_info(app.path), "created": True},
+            )
+        else:
+            logger.error(f"Failed to create venv for {app_name}: {msg}")
+            self.error(f"Failed to create venv: {msg}", 500)
 
     async def _action_rebuild_venv(self, app_name, app) -> None:
         """Full lifecycle: stop -> clear venv -> create venv -> install deps -> start."""
@@ -615,7 +643,7 @@ def get_admin_handlers(app_loader=None, process_manager=None) -> list:
         (rf"{ADMIN_PATH}/api/apps/?", AdminAPIAppsHandler, init_kwargs),
         (rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)/?", AdminAPIAppDetailHandler, init_kwargs),
         (
-            rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)/(?P<action>start|stop|restart|clear-venv|rebuild-venv|processes|venv-status)/?",
+            rf"{ADMIN_PATH}/api/apps/(?P<app_name>[^/]+)/(?P<action>start|stop|restart|clear-venv|create-venv|rebuild-venv|processes|venv-status)/?",
             AdminAPIAppControlHandler,
             init_kwargs,
         ),
