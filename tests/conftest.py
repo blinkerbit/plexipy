@@ -2,13 +2,14 @@
 Pytest configuration and shared fixtures for PyRest tests.
 """
 
-import os
-import sys
 import json
+import os
 import shutil
+import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator, Dict, Any
+from typing import Any
 
 import pytest
 
@@ -17,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 @pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
+def temp_dir() -> Generator[Path]:
     """Create a temporary directory for tests."""
     temp_path = Path(tempfile.mkdtemp())
     yield temp_path
@@ -25,7 +26,7 @@ def temp_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def sample_config() -> Dict[str, Any]:
+def sample_config() -> dict[str, Any]:
     """Sample framework configuration."""
     return {
         "host": "0.0.0.0",
@@ -39,12 +40,12 @@ def sample_config() -> Dict[str, Any]:
         "jwt_expiry_hours": 24,
         "cors_enabled": True,
         "cors_origins": ["*"],
-        "isolated_app_base_port": 8001
+        "isolated_app_base_port": 8001,
     }
 
 
 @pytest.fixture
-def sample_auth_config() -> Dict[str, Any]:
+def sample_auth_config() -> dict[str, Any]:
     """Sample auth configuration."""
     return {
         "provider": "azure_ad",
@@ -55,12 +56,12 @@ def sample_auth_config() -> Dict[str, Any]:
         "scopes": ["openid", "profile", "email"],
         "jwt_secret": "test-jwt-secret",
         "jwt_expiry_hours": 24,
-        "jwt_algorithm": "HS256"
+        "jwt_algorithm": "HS256",
     }
 
 
 @pytest.fixture
-def sample_app_config() -> Dict[str, Any]:
+def sample_app_config() -> dict[str, Any]:
     """Sample app configuration."""
     return {
         "name": "testapp",
@@ -68,14 +69,12 @@ def sample_app_config() -> Dict[str, Any]:
         "description": "Test application",
         "enabled": True,
         "auth_required": False,
-        "settings": {
-            "custom_setting": "value"
-        }
+        "settings": {"custom_setting": "value"},
     }
 
 
 @pytest.fixture
-def temp_config_file(temp_dir: Path, sample_config: Dict[str, Any]) -> Path:
+def temp_config_file(temp_dir: Path, sample_config: dict[str, Any]) -> Path:
     """Create a temporary config.json file."""
     config_path = temp_dir / "config.json"
     with open(config_path, "w") as f:
@@ -84,7 +83,7 @@ def temp_config_file(temp_dir: Path, sample_config: Dict[str, Any]) -> Path:
 
 
 @pytest.fixture
-def temp_auth_config_file(temp_dir: Path, sample_auth_config: Dict[str, Any]) -> Path:
+def temp_auth_config_file(temp_dir: Path, sample_auth_config: dict[str, Any]) -> Path:
     """Create a temporary auth_config.json file."""
     config_path = temp_dir / "auth_config.json"
     with open(config_path, "w") as f:
@@ -93,19 +92,19 @@ def temp_auth_config_file(temp_dir: Path, sample_auth_config: Dict[str, Any]) ->
 
 
 @pytest.fixture
-def temp_app_dir(temp_dir: Path, sample_app_config: Dict[str, Any]) -> Path:
+def temp_app_dir(temp_dir: Path, sample_app_config: dict[str, Any]) -> Path:
     """Create a temporary app directory with config and handlers."""
     # Use source_apps to avoid conflict with app_loader's apps folder
     apps_dir = temp_dir / "source_apps"
     app_dir = apps_dir / "testapp"
     app_dir.mkdir(parents=True)
-    
+
     # Create config.json
     with open(app_dir / "config.json", "w") as f:
         json.dump(sample_app_config, f)
-    
+
     # Create handlers.py
-    handlers_content = '''
+    handlers_content = """
 from pyrest.handlers import BaseHandler
 
 class TestHandler(BaseHandler):
@@ -116,10 +115,10 @@ def get_handlers():
     return [
         (r"/", TestHandler),
     ]
-'''
+"""
     with open(app_dir / "handlers.py", "w") as f:
         f.write(handlers_content)
-    
+
     return app_dir
 
 
@@ -130,24 +129,24 @@ def temp_isolated_app_dir(temp_dir: Path) -> Path:
     apps_dir = temp_dir / "source_apps"
     app_dir = apps_dir / "isolatedapp"
     app_dir.mkdir(parents=True)
-    
+
     # Create config.json
     config = {
         "name": "isolatedapp",
         "version": "1.0.0",
         "description": "Isolated test application",
         "enabled": True,
-        "port": 8002
+        "port": 8002,
     }
     with open(app_dir / "config.json", "w") as f:
         json.dump(config, f)
-    
+
     # Create requirements.txt (triggers isolated mode)
     with open(app_dir / "requirements.txt", "w") as f:
         f.write("tornado>=6.4\n")
-    
+
     # Create handlers.py
-    handlers_content = '''
+    handlers_content = """
 from pyrest.handlers import BaseHandler
 
 class IsolatedHandler(BaseHandler):
@@ -158,10 +157,10 @@ def get_handlers():
     return [
         (r"/", IsolatedHandler),
     ]
-'''
+"""
     with open(app_dir / "handlers.py", "w") as f:
         f.write(handlers_content)
-    
+
     return app_dir
 
 
@@ -169,32 +168,27 @@ def get_handlers():
 def mock_env_vars():
     """Set up mock environment variables for testing."""
     original_env = os.environ.copy()
-    
+
     os.environ["AZURE_AD_TENANT_ID"] = "test-tenant"
     os.environ["AZURE_AD_CLIENT_ID"] = "test-client"
     os.environ["AZURE_AD_CLIENT_SECRET"] = "test-secret"
     os.environ["JWT_SECRET"] = "test-jwt-secret"
-    
+
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
 
 
 @pytest.fixture
-def sample_tm1_config() -> Dict[str, Any]:
+def sample_tm1_config() -> dict[str, Any]:
     """Sample TM1 app configuration with multiple instances."""
     return {
         "name": "tm1app",
         "version": "1.0.0",
-        "settings": {
-            "default_instance": "production",
-            "session_context": "Test Session"
-        },
-        "os_vars": {
-            "TM1_DEFAULT_INSTANCE": "production"
-        },
+        "settings": {"default_instance": "production", "session_context": "Test Session"},
+        "os_vars": {"TM1_DEFAULT_INSTANCE": "production"},
         "tm1_instances": {
             "production": {
                 "description": "Production TM1 Server",
@@ -203,23 +197,23 @@ def sample_tm1_config() -> Dict[str, Any]:
                 "port": "8010",
                 "ssl": True,
                 "user": "admin",
-                "password": "secret"
+                "password": "secret",
             },
             "development": {
                 "description": "Development TM1 Server",
                 "connection_type": "onprem",
                 "server": "dev-tm1.local",
                 "port": "8011",
-                "ssl": True
+                "ssl": True,
             },
             "cloud": {
                 "description": "Cloud TM1 Instance",
                 "connection_type": "cloud",
                 "cloud_region": "us-east",
                 "cloud_tenant": "test-tenant",
-                "cloud_api_key": "test-api-key"
-            }
-        }
+                "cloud_api_key": "test-api-key",
+            },
+        },
     }
 
 
@@ -235,15 +229,15 @@ def temp_log_dir(temp_dir: Path) -> Path:
 def reset_tm1_manager():
     """Reset TM1ConnectionManager before and after test."""
     from pyrest.utils.tm1 import TM1ConnectionManager
-    
+
     # Reset before test
     TM1ConnectionManager._instances.clear()
     TM1ConnectionManager._connections.clear()
     TM1ConnectionManager._initialized = False
     TM1ConnectionManager._default_instance = "default"
-    
+
     yield
-    
+
     # Reset after test
     TM1ConnectionManager._instances.clear()
     TM1ConnectionManager._connections.clear()
@@ -255,6 +249,7 @@ def reset_tm1_manager():
 def reset_auth_config():
     """Reset AuthConfig singleton before test."""
     from pyrest.auth import AuthConfig
+
     AuthConfig._instance = None
     yield
     AuthConfig._instance = None

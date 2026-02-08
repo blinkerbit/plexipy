@@ -28,143 +28,157 @@ Endpoints:
 - POST /pyrest/tm1data/instance/{name}/reconnect      - Force reconnection
 """
 
-import os
+import contextlib
 import json
+import os
 import time
-from typing import Dict, Any, Optional, List
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-import tornado.web
 import tornado.ioloop
+import tornado.web
 
 # Thread pool for async TM1 operations (TM1py is blocking)
 TM1_EXECUTOR = ThreadPoolExecutor(max_workers=16)
 
 # Import TM1 utilities from pyrest.utils
 try:
+    from pyrest.utils.logging import AppLogger, get_app_logger, setup_app_logging
     from pyrest.utils.tm1 import TM1ConnectionManager, TM1InstanceConfig, is_tm1_available
-    from pyrest.utils.logging import setup_app_logging, get_app_logger, AppLogger
+
     TM1_AVAILABLE = is_tm1_available()
 except ImportError:
     # Fallback when pyrest is not in path (isolated execution)
     TM1_AVAILABLE = False
     TM1ConnectionManager = None
     TM1InstanceConfig = None
-    
+
     # Fallback logging stubs for isolated execution
     class AppLogger:
         """Stub AppLogger for isolated execution."""
-        def info(self, msg): pass
-        def debug(self, msg): pass
-        def warning(self, msg): pass
-        def error(self, msg): pass
-    
+
+        def info(self, msg):
+            pass
+
+        def debug(self, msg):
+            pass
+
+        def warning(self, msg):
+            pass
+
+        def error(self, msg):
+            pass
+
     def setup_app_logging(*args, **kwargs):
         return None
-    
+
     def get_app_logger(*args, **kwargs):
         return None
-    
+
     # Try direct TM1py import
     try:
-        from TM1py import TM1Service
+        from TM1py import TM1Service  # noqa: F401
+
         TM1_AVAILABLE = True
     except ImportError:
         pass
 
 # Import base handler and authentication
 try:
-    from pyrest.handlers import BaseHandler
     from pyrest.auth import authenticated
+    from pyrest.handlers import BaseHandler
 except ImportError:
     # Fallback for isolated execution
     import tornado.web
-    
+
     class BaseHandler(tornado.web.RequestHandler):
         def initialize(self, app_config=None, **kwargs):
             self.app_config = app_config or {}
             self._current_user = None
-        
+
         def set_default_headers(self):
             self.set_header("Content-Type", "application/json")
             origin = self.request.headers.get("Origin", "*")
             self.set_header("Access-Control-Allow-Origin", origin)
             self.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
             self.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        
+
         def options(self, *args, **kwargs):
             self.set_status(204)
             self.finish()
-        
+
         @property
         def current_user(self):
             return self._current_user
-        
+
         def get_json_body(self):
             try:
                 return json.loads(self.request.body.decode())
-            except:
+            except Exception:
                 return {}
-        
+
         def success(self, data=None, message="Success", status_code=200):
             self.set_status(status_code)
             resp = {"success": True, "message": message}
             if data:
                 resp["data"] = data
             self.write(resp)
-        
+
         def error(self, message, status_code=400):
             self.set_status(status_code)
             self.write({"success": False, "error": message})
-    
+
     def authenticated(func):
         import functools
+
         @functools.wraps(func)
         async def wrapper(self, *args, **kwargs):
             auth_header = self.request.headers.get("Authorization", "")
             if not auth_header.startswith("Bearer "):
                 self.set_status(401)
                 self.write({"error": "Authorization required"})
-                return
+                return None
             return await func(self, *args, **kwargs)
+
         return wrapper
 
+
+# Error Message Constants
+ERR_CM_NOT_AVAILABLE = "TM1ConnectionManager not available"
+ERR_TM1PY_NOT_AVAILABLE = "TM1py not available"
+ERR_INSTANCE_NOT_FOUND = "TM1 instance '{instance_name}' not found"
+ERR_CONNECT_FAILED = "Could not connect to TM1 instance '{instance_name}'"
+
 # App-specific logger
-_app_logger: Optional[AppLogger] = None
+_app_logger: AppLogger | None = None
 
 
-def _get_logger() -> Optional[AppLogger]:
+def _get_logger() -> AppLogger | None:
     """Get or create the app logger."""
     global _app_logger
     if _app_logger is None:
-        try:
+        with contextlib.suppress(Exception):
             _app_logger = setup_app_logging(
-                app_name="tm1data",
-                log_dir="logs",
-                log_level="INFO",
-                console_output=False
+                app_name="tm1data", log_dir="logs", log_level="INFO", console_output=False
             )
-        except Exception:
-            pass
     return _app_logger
 
 
 class TM1BaseHandler(BaseHandler):
     """Base handler with TM1 connection manager initialization and logging."""
-    
+
     def initialize(self, app_config=None, **kwargs):
         super().initialize(app_config=app_config, **kwargs)
         self._start_time = time.time()
-        
+
         # Initialize logger
         self.logger = _get_logger()
-        
+
         # Initialize the connection manager with app config
         if app_config and TM1ConnectionManager and not TM1ConnectionManager._initialized:
             app_logger_instance = self.logger.get_logger() if self.logger else None
             TM1ConnectionManager.initialize(app_config, app_logger_instance)
-    
+
     def on_finish(self):
         """Log request completion."""
         if self.logger:
@@ -175,27 +189,33 @@ class TM1BaseHandler(BaseHandler):
                 status_code=self.get_status(),
                 duration_ms=duration_ms,
             )
-    
+
     async def run_tm1_async(self, func, *args, **kwargs):
         """
         Run a blocking TM1 operation asynchronously in a thread pool.
-        
+
         Usage:
             result = await self.run_tm1_async(some_blocking_func, arg1, arg2)
         """
         loop = tornado.ioloop.IOLoop.current()
         return await loop.run_in_executor(TM1_EXECUTOR, partial(func, *args, **kwargs))
-    
-    def get_instance_name(self, instance_name: str = None) -> str:
+
+    def get_instance_name(self, instance_name: str | None = None) -> str:
         """Get the instance name from parameter or query string."""
         if instance_name:
             return instance_name
         if TM1ConnectionManager:
             return self.get_argument("instance", TM1ConnectionManager.get_default_instance())
         return self.get_argument("instance", "default")
-    
-    def log_tm1_operation(self, operation: str, instance: str, success: bool, 
-                          duration_ms: float = None, details: Dict = None):
+
+    def log_tm1_operation(
+        self,
+        operation: str,
+        instance: str,
+        success: bool,
+        duration_ms: float | None = None,
+        details: dict | None = None,
+    ):
         """Log a TM1 operation."""
         if self.logger:
             self.logger.log_tm1_operation(operation, instance, success, duration_ms, details)
@@ -203,282 +223,291 @@ class TM1BaseHandler(BaseHandler):
 
 class TM1InfoHandler(TM1BaseHandler):
     """TM1 API information endpoint."""
-    
+
     async def get(self):
         """Return API information and configured instances."""
         if not TM1ConnectionManager:
-            self.success(data={
+            self.success(
+                data={
+                    "name": "TM1 Data API",
+                    "version": "2.0.0",
+                    "tm1py_available": TM1_AVAILABLE,
+                    "error": ERR_CM_NOT_AVAILABLE,
+                }
+            )
+            return
+
+        instances = TM1ConnectionManager.get_all_instances()
+        instances_info = [inst.to_dict() for inst in instances.values()]
+
+        self.success(
+            data={
                 "name": "TM1 Data API",
                 "version": "2.0.0",
                 "tm1py_available": TM1_AVAILABLE,
-                "error": "TM1ConnectionManager not available"
-            })
-            return
-        
-        instances = TM1ConnectionManager.get_all_instances()
-        instances_info = [inst.to_dict() for inst in instances.values()]
-        
-        self.success(data={
-            "name": "TM1 Data API",
-            "version": "2.0.0",
-            "tm1py_available": TM1_AVAILABLE,
-            "app_type": "isolated",
-            "default_instance": TM1ConnectionManager.get_default_instance(),
-            "instances": instances_info,
-            "instance_count": len(instances),
-            "endpoints": [
-                "GET  /instances - List all configured TM1 instances",
-                "GET  /instance/{name}/cubes - List cubes for instance",
-                "GET  /instance/{name}/cube/{cube}/dimensions - Get cube dimensions",
-                "POST /instance/{name}/query - Execute MDX query",
-                "GET  /instance/{name}/status - Check connection status",
-                "POST /instance/{name}/reconnect - Force reconnection"
-            ]
-        })
+                "app_type": "isolated",
+                "default_instance": TM1ConnectionManager.get_default_instance(),
+                "instances": instances_info,
+                "instance_count": len(instances),
+                "endpoints": [
+                    "GET  /instances - List all configured TM1 instances",
+                    "GET  /instance/{name}/cubes - List cubes for instance",
+                    "GET  /instance/{name}/cube/{cube}/dimensions - Get cube dimensions",
+                    "POST /instance/{name}/query - Execute MDX query",
+                    "GET  /instance/{name}/status - Check connection status",
+                    "POST /instance/{name}/reconnect - Force reconnection",
+                ],
+            }
+        )
 
 
 class TM1InstancesHandler(TM1BaseHandler):
     """List all configured TM1 instances."""
-    
+
     async def get(self):
         """Return list of all configured TM1 instances."""
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         instances = TM1ConnectionManager.get_all_instances()
         instances_info = []
-        
+
         for name, inst in instances.items():
             info = inst.to_dict()
             info["connected"] = TM1ConnectionManager.is_connected(name)
             instances_info.append(info)
-        
-        self.success(data={
-            "instances": instances_info,
-            "count": len(instances_info),
-            "default_instance": TM1ConnectionManager.get_default_instance()
-        })
+
+        self.success(
+            data={
+                "instances": instances_info,
+                "count": len(instances_info),
+                "default_instance": TM1ConnectionManager.get_default_instance(),
+            }
+        )
 
 
 class TM1InstanceCubesHandler(TM1BaseHandler):
     """List TM1 cubes for a specific instance."""
-    
+
     @authenticated
     async def get(self, instance_name: str):
         """Return list of TM1 cubes for the specified instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         # Validate instance exists
         if not TM1ConnectionManager.has_instance(instance_name):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
-        
+
         def _get_cubes_sync(inst_name):
             """Blocking TM1 operation to get cube names."""
             tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
                 return None
             return tm1.cubes.get_all_names()
-        
+
         start_time = time.time()
         try:
             cubes = await self.run_tm1_async(_get_cubes_sync, instance_name)
-            
+
             if cubes is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 self.log_tm1_operation("get_cubes", instance_name, False)
                 return
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
-            self.log_tm1_operation("get_cubes", instance_name, True, duration_ms, 
-                                   {"cube_count": len(cubes)})
-            
-            self.success(data={
-                "instance": instance_name,
-                "cubes": cubes,
-                "count": len(cubes)
-            })
-            
+
+            self.log_tm1_operation(
+                "get_cubes", instance_name, True, duration_ms, {"cube_count": len(cubes)}
+            )
+
+            self.success(data={"instance": instance_name, "cubes": cubes, "count": len(cubes)})
+
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
-            self.log_tm1_operation("get_cubes", instance_name, False, duration_ms,
-                                   {"error": str(e)})
-            self.error(f"TM1 error on instance '{instance_name}': {str(e)}", 500)
+            self.log_tm1_operation(
+                "get_cubes", instance_name, False, duration_ms, {"error": str(e)}
+            )
+            self.error(f"TM1 error on instance '{instance_name}': {e!s}", 500)
 
 
 class TM1InstanceCubeDimensionsHandler(TM1BaseHandler):
     """Get dimensions for a specific cube on a specific instance."""
-    
+
     @authenticated
     async def get(self, instance_name: str, cube_name: str):
         """Return dimensions of a cube for the specified instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         # Validate instance exists
         if not TM1ConnectionManager.has_instance(instance_name):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
-        
+
         def _get_dimensions_sync(inst_name, cube):
             """Blocking TM1 operation to get cube dimensions."""
             tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
                 return None
             return tm1.cubes.get(cube).dimensions
-        
+
         start_time = time.time()
         try:
             dimensions = await self.run_tm1_async(_get_dimensions_sync, instance_name, cube_name)
-            
+
             if dimensions is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 return
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
-            self.log_tm1_operation("get_cube_dimensions", instance_name, True, duration_ms,
-                                   {"cube": cube_name})
-            
-            self.success(data={
-                "instance": instance_name,
-                "cube": cube_name,
-                "dimensions": dimensions
-            })
-            
+
+            self.log_tm1_operation(
+                "get_cube_dimensions", instance_name, True, duration_ms, {"cube": cube_name}
+            )
+
+            self.success(
+                data={"instance": instance_name, "cube": cube_name, "dimensions": dimensions}
+            )
+
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
-            self.log_tm1_operation("get_cube_dimensions", instance_name, False, duration_ms,
-                                   {"cube": cube_name, "error": str(e)})
-            self.error(f"TM1 error on instance '{instance_name}': {str(e)}", 500)
+            self.log_tm1_operation(
+                "get_cube_dimensions",
+                instance_name,
+                False,
+                duration_ms,
+                {"cube": cube_name, "error": str(e)},
+            )
+            self.error(f"TM1 error on instance '{instance_name}': {e!s}", 500)
 
 
 class TM1InstanceQueryHandler(TM1BaseHandler):
     """Execute MDX queries on a specific instance."""
-    
+
     @authenticated
     async def post(self, instance_name: str):
         """Execute an MDX query on the specified instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         # Validate instance exists
         if not TM1ConnectionManager.has_instance(instance_name):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
-        
+
         body = self.get_json_body()
         mdx = body.get("mdx")
-        
+
         if not mdx:
             self.error("MDX query is required", 400)
             return
-        
+
         def _execute_mdx_sync(inst_name, mdx_query):
             """Blocking TM1 operation to execute MDX query."""
             tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
                 return None
-            
+
             cellset = tm1.cells.execute_mdx(mdx_query)
             result = []
             for cell in cellset:
-                result.append({
-                    "coordinates": cell.get("Ordinal"),
-                    "value": cell.get("Value")
-                })
+                result.append({"coordinates": cell.get("Ordinal"), "value": cell.get("Value")})
             return result
-        
+
         start_time = time.time()
         try:
             result = await self.run_tm1_async(_execute_mdx_sync, instance_name, mdx)
-            
+
             if result is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 return
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            self.log_tm1_operation("execute_mdx", instance_name, True, duration_ms,
-                                   {"result_count": len(result)})
-            
-            self.success(data={
-                "instance": instance_name,
-                "query": mdx,
-                "results": result,
-                "count": len(result)
-            })
-            
+            self.log_tm1_operation(
+                "execute_mdx", instance_name, True, duration_ms, {"result_count": len(result)}
+            )
+
+            self.success(
+                data={
+                    "instance": instance_name,
+                    "query": mdx,
+                    "results": result,
+                    "count": len(result),
+                }
+            )
+
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
-            self.log_tm1_operation("execute_mdx", instance_name, False, duration_ms,
-                                   {"error": str(e)})
-            self.error(f"TM1 query error on instance '{instance_name}': {str(e)}", 500)
+            self.log_tm1_operation(
+                "execute_mdx", instance_name, False, duration_ms, {"error": str(e)}
+            )
+            self.error(f"TM1 query error on instance '{instance_name}': {e!s}", 500)
 
 
 class TM1InstanceStatusHandler(TM1BaseHandler):
     """Check TM1 connection status for a specific instance."""
-    
+
     @authenticated
     async def get(self, instance_name: str):
         """Return TM1 connection status for the specified instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         def _get_status_sync(inst_name):
             """Get connection status (may involve connection test)."""
             return TM1ConnectionManager.get_connection_status(inst_name)
-        
+
         status = await self.run_tm1_async(_get_status_sync, instance_name)
-        
+
         if not status.get("configured"):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
-        
+
         self.success(data=status)
 
 
 class TM1InstanceReconnectHandler(TM1BaseHandler):
     """Force reconnection to a specific TM1 instance."""
-    
+
     @authenticated
     async def post(self, instance_name: str):
         """Reset and reconnect to the specified TM1 instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         # Validate instance exists
         if not TM1ConnectionManager.has_instance(instance_name):
             self.error(f"TM1 instance '{instance_name}' not found", 404)
             return
-        
+
         def _reconnect_sync(inst_name):
             """Blocking reconnect operation."""
             TM1ConnectionManager.reset_connection(inst_name)
@@ -486,161 +515,160 @@ class TM1InstanceReconnectHandler(TM1BaseHandler):
             if tm1:
                 return tm1.server.get_server_name()
             return None
-        
+
         start_time = time.time()
         try:
             server_name = await self.run_tm1_async(_reconnect_sync, instance_name)
             duration_ms = (time.time() - start_time) * 1000
-            
+
             if server_name:
                 self.log_tm1_operation("reconnect", instance_name, True, duration_ms)
-                self.success(data={
-                    "instance": instance_name,
-                    "reconnected": True,
-                    "server_name": server_name
-                })
+                self.success(
+                    data={
+                        "instance": instance_name,
+                        "reconnected": True,
+                        "server_name": server_name,
+                    }
+                )
             else:
                 self.log_tm1_operation("reconnect", instance_name, False, duration_ms)
                 self.error(f"Failed to reconnect to TM1 instance '{instance_name}'", 503)
-                
+
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
-            self.log_tm1_operation("reconnect", instance_name, False, duration_ms,
-                                   {"error": str(e)})
-            self.error(f"Reconnection error for instance '{instance_name}': {str(e)}", 500)
+            self.log_tm1_operation(
+                "reconnect", instance_name, False, duration_ms, {"error": str(e)}
+            )
+            self.error(f"Reconnection error for instance '{instance_name}': {e!s}", 500)
 
 
 # Legacy handlers for backward compatibility (use default instance)
 class TM1CubesHandler(TM1BaseHandler):
     """List TM1 cubes (uses default instance)."""
-    
+
     @authenticated
     async def get(self):
         """Return list of TM1 cubes from default instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         instance_name = self.get_instance_name()
-        
+
         def _get_cubes_sync(inst_name):
             """Blocking TM1 operation."""
             tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
                 return None
             return tm1.cubes.get_all_names()
-        
+
         start_time = time.time()
         try:
             cubes = await self.run_tm1_async(_get_cubes_sync, instance_name)
-            
+
             if cubes is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 return
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            
-            self.log_tm1_operation("get_cubes", instance_name, True, duration_ms,
-                                   {"cube_count": len(cubes)})
-            
-            self.success(data={
-                "instance": instance_name,
-                "cubes": cubes,
-                "count": len(cubes)
-            })
-            
+
+            self.log_tm1_operation(
+                "get_cubes", instance_name, True, duration_ms, {"cube_count": len(cubes)}
+            )
+
+            self.success(data={"instance": instance_name, "cubes": cubes, "count": len(cubes)})
+
         except Exception as e:
-            self.error(f"TM1 error: {str(e)}", 500)
+            self.error(f"TM1 error: {e!s}", 500)
 
 
 class TM1QueryHandler(TM1BaseHandler):
     """Execute MDX queries (uses default instance)."""
-    
+
     @authenticated
     async def post(self):
         """Execute an MDX query on default instance."""
         if not TM1_AVAILABLE:
-            self.error("TM1py not available", 503)
+            self.error(ERR_TM1PY_NOT_AVAILABLE, 503)
             return
-        
+
         if not TM1ConnectionManager:
-            self.error("TM1ConnectionManager not available", 503)
+            self.error(ERR_CM_NOT_AVAILABLE, 503)
             return
-        
+
         instance_name = self.get_instance_name()
         body = self.get_json_body()
         mdx = body.get("mdx")
-        
+
         # Allow specifying instance in request body
         if "instance" in body:
             instance_name = body["instance"]
-        
+
         if not mdx:
             self.error("MDX query is required", 400)
             return
-        
+
         def _execute_mdx_sync(inst_name, mdx_query):
             """Blocking TM1 operation."""
             tm1 = TM1ConnectionManager.get_connection(inst_name)
             if not tm1:
                 return None
-            
+
             cellset = tm1.cells.execute_mdx(mdx_query)
             result = []
             for cell in cellset:
-                result.append({
-                    "coordinates": cell.get("Ordinal"),
-                    "value": cell.get("Value")
-                })
+                result.append({"coordinates": cell.get("Ordinal"), "value": cell.get("Value")})
             return result
-        
+
         start_time = time.time()
         try:
             result = await self.run_tm1_async(_execute_mdx_sync, instance_name, mdx)
-            
+
             if result is None:
                 self.error(f"Could not connect to TM1 instance '{instance_name}'", 503)
                 return
-            
+
             duration_ms = (time.time() - start_time) * 1000
-            self.log_tm1_operation("execute_mdx", instance_name, True, duration_ms,
-                                   {"result_count": len(result)})
-            
-            self.success(data={
-                "instance": instance_name,
-                "query": mdx,
-                "results": result,
-                "count": len(result)
-            })
-            
+            self.log_tm1_operation(
+                "execute_mdx", instance_name, True, duration_ms, {"result_count": len(result)}
+            )
+
+            self.success(
+                data={
+                    "instance": instance_name,
+                    "query": mdx,
+                    "results": result,
+                    "count": len(result),
+                }
+            )
+
         except Exception as e:
-            self.error(f"TM1 query error: {str(e)}", 500)
+            self.error(f"TM1 query error: {e!s}", 500)
 
 
 class TM1UIHandler(tornado.web.RequestHandler):
     """Serve the TM1 Data Connector UI."""
-    
+
     def initialize(self, app_config=None, **kwargs):
         self.app_config = app_config or {}
-    
+
     async def get(self):
         """Serve the main UI page."""
-        import os
         # Get the static folder path relative to this file
-        app_path = os.environ.get('PYREST_APP_PATH', os.path.dirname(__file__))
-        html_path = os.path.join(app_path, 'static', 'index.html')
-        
+        app_path = os.environ.get("PYREST_APP_PATH", os.path.dirname(__file__))
+        html_path = os.path.join(app_path, "static", "index.html")
+
         try:
-            with open(html_path, 'r', encoding='utf-8') as f:
-                self.set_header('Content-Type', 'text/html')
+            with open(html_path, encoding="utf-8") as f:
+                self.set_header("Content-Type", "text/html")
                 self.write(f.read())
         except FileNotFoundError:
             self.set_status(404)
-            self.write({'error': 'UI not found', 'path': html_path})
+            self.write({"error": "UI not found", "path": html_path})
 
 
 def get_handlers():
@@ -648,20 +676,19 @@ def get_handlers():
     return [
         # UI - Web interface for TM1 connections and queries
         (r"/ui", TM1UIHandler),
-        
         # API info endpoint
         (r"/", TM1InfoHandler),
-        
         # List all instances
         (r"/instances", TM1InstancesHandler),
-        
         # Instance-specific endpoints
         (r"/instance/(?P<instance_name>[^/]+)/cubes", TM1InstanceCubesHandler),
-        (r"/instance/(?P<instance_name>[^/]+)/cube/(?P<cube_name>[^/]+)/dimensions", TM1InstanceCubeDimensionsHandler),
+        (
+            r"/instance/(?P<instance_name>[^/]+)/cube/(?P<cube_name>[^/]+)/dimensions",
+            TM1InstanceCubeDimensionsHandler,
+        ),
         (r"/instance/(?P<instance_name>[^/]+)/query", TM1InstanceQueryHandler),
         (r"/instance/(?P<instance_name>[^/]+)/status", TM1InstanceStatusHandler),
         (r"/instance/(?P<instance_name>[^/]+)/reconnect", TM1InstanceReconnectHandler),
-        
         # Legacy endpoints (use default instance or ?instance= query param)
         (r"/cubes", TM1CubesHandler),
         (r"/query", TM1QueryHandler),

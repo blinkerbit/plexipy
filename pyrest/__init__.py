@@ -6,21 +6,40 @@ A modular framework that allows developers to easily create and deploy REST APIs
 Supports both embedded apps (in main process) and isolated apps (separate venv/process).
 
 Features:
+- Pydantic-based request validation
+- Simple handler base class for easy development
 - Azure AD authentication
 - JWT token support
 - Automatic virtual environment management for isolated apps
 - Nginx configuration generation
 - Simple decorator-based routing
 
-Quick Start:
+Quick Start (Simple - Recommended for beginners):
+    from pyrest.simple_handler import SimpleHandler
+    from pyrest.validation import RequestModel, field
+
+    class FetchInput(RequestModel):
+        cube: str = field(description="Cube name")
+        element: str = field(description="Element")
+
+    class MyHandler(SimpleHandler):
+        async def post(self):
+            data = self.get_data(model=FetchInput)
+            if not data:
+                return
+
+            result = await self.run_async(do_something, data.cube, data.element)
+            self.ok(result)
+
+Quick Start (Advanced):
     from pyrest.handlers import BaseHandler
     from pyrest.auth import authenticated
     from pyrest.decorators import RestHandler, get, post
-    
+
     class MyHandler(BaseHandler):
         async def get(self):
             self.success(data={"message": "Hello!"})
-        
+
         @authenticated
         async def post(self):
             body = self.get_json_body()
@@ -30,54 +49,58 @@ Quick Start:
 __version__ = "1.0.0"
 __author__ = "PyRest Team"
 
-# Main exports
-from .handlers import BaseHandler, BASE_PATH
-from .auth import authenticated, require_roles, get_auth_manager, get_auth_config
+# Main exports - Simple API (recommended for beginners)
+from .app_loader import AppConfig, AppLoader
+from .auth import authenticated, get_auth_config, get_auth_manager, require_roles
 from .config import get_config, get_env
-from .decorators import RestHandler, get, post, put, patch, delete, route, authenticated, roles
-from .app_loader import AppLoader, AppConfig
-from .venv_manager import get_venv_manager
-from .process_manager import get_process_manager
+from .decorators import RestHandler, delete, get, patch, post, put, roles, route
+
+# Main exports - Advanced API
+from .handlers import BASE_PATH, BaseHandler
 from .nginx_generator import get_nginx_generator
-from .server import create_app, run_server, PyRestApplication
+from .process_manager import get_process_manager
+from .server import PyRestApplication, create_app, run_server
+from .simple_handler import SimpleHandler
+from .validation import RequestModel, field, validate, validate_required
+from .venv_manager import get_venv_manager
 
 __all__ = [
-    # Version
-    "__version__",
-    
+    "BASE_PATH",
+    "AppConfig",
+    # App management
+    "AppLoader",
     # Handlers
     "BaseHandler",
+    "PyRestApplication",
+    "RequestModel",
     "RestHandler",
-    "BASE_PATH",
-    
+    # Simple API (recommended)
+    "SimpleHandler",
+    # Version
+    "__version__",
     # Auth
     "authenticated",
-    "require_roles",
-    "roles",
-    "get_auth_manager",
+    # Server
+    "create_app",
+    "delete",
+    "field",
+    # Decorators
+    "get",
     "get_auth_config",
-    
+    "get_auth_manager",
     # Config
     "get_config",
     "get_env",
-    
-    # Decorators
-    "get",
+    "get_nginx_generator",
+    "get_process_manager",
+    "get_venv_manager",
+    "patch",
     "post",
     "put",
-    "patch",
-    "delete",
+    "require_roles",
+    "roles",
     "route",
-    
-    # App management
-    "AppLoader",
-    "AppConfig",
-    "get_venv_manager",
-    "get_process_manager",
-    "get_nginx_generator",
-    
-    # Server
-    "create_app",
     "run_server",
-    "PyRestApplication",
+    "validate",
+    "validate_required",
 ]

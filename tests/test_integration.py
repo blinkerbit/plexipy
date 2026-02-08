@@ -3,23 +3,22 @@ Integration tests for the PyRest framework.
 """
 
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
 import sys
+from pathlib import Path
+from unittest.mock import patch
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import tornado.testing
 import tornado.web
 
-from pyrest.server import PyRestApplication, create_app
 from pyrest.handlers import BASE_PATH
+from pyrest.server import create_app
 
 
 class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
     """Integration tests for the PyRest server."""
-    
+
     def get_app(self):
         """Create test application with mocked config."""
         with patch("pyrest.server.get_config") as mock_config:
@@ -31,7 +30,7 @@ class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
             mock_config.return_value.base_path = "/pyrest"
             mock_config.return_value.auth_config_file = "auth_config.json"
             mock_config.return_value.get.return_value = None
-            
+
             with patch("pyrest.server.get_env"):
                 with patch("pyrest.server.AppLoader") as mock_loader:
                     mock_loader.return_value.load_all_apps.return_value = []
@@ -40,76 +39,80 @@ class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
                     mock_loader.return_value.get_embedded_apps.return_value = []
                     mock_loader.return_value.get_isolated_apps.return_value = []
                     mock_loader.return_value.get_loaded_apps_info.return_value = []
-                    
+
                     return create_app()
-    
+
     def test_root_endpoint(self):
-        """Root endpoint should return API info."""
+        """Root endpoint should return API info (HTML template or JSON fallback)."""
         response = self.fetch(f"{BASE_PATH}/")
-        
+
         assert response.code == 200
-        
-        data = json.loads(response.body)
-        assert data["success"] is True
-        assert "PyRest" in data["data"]["name"]
-        assert data["data"]["base_path"] == BASE_PATH
-    
+
+        body = response.body.decode("utf-8")
+        try:
+            data = json.loads(body)
+            # JSON fallback when no template is available
+            assert data["success"] is True
+            assert "PyRest" in data["data"]["name"]
+            assert data["data"]["base_path"] == BASE_PATH
+        except json.JSONDecodeError:
+            # HTML template rendered successfully
+            assert "PyRest" in body
+
     def test_health_endpoint(self):
         """Health endpoint should return healthy status."""
         response = self.fetch(f"{BASE_PATH}/health")
-        
+
         assert response.code == 200
-        
+
         data = json.loads(response.body)
         assert data["data"]["status"] == "healthy"
-    
+
     def test_apps_endpoint(self):
         """Apps endpoint should list apps."""
         response = self.fetch(f"{BASE_PATH}/apps")
-        
+
         assert response.code == 200
-        
+
         data = json.loads(response.body)
         assert "apps" in data["data"]
-    
+
     def test_status_endpoint(self):
         """Status endpoint should return system status."""
         response = self.fetch(f"{BASE_PATH}/status")
-        
+
         assert response.code == 200
-        
+
         data = json.loads(response.body)
         assert "framework" in data["data"]
         assert "embedded_apps" in data["data"]
         assert "isolated_apps" in data["data"]
-    
+
     def test_cors_headers(self):
         """Should include CORS headers."""
         response = self.fetch(f"{BASE_PATH}/health")
-        
+
         assert "Access-Control-Allow-Origin" in response.headers
         assert "Access-Control-Allow-Methods" in response.headers
-    
+
     def test_options_request(self):
         """Should handle CORS preflight requests."""
         response = self.fetch(
-            f"{BASE_PATH}/health",
-            method="OPTIONS",
-            allow_nonstandard_methods=True
+            f"{BASE_PATH}/health", method="OPTIONS", allow_nonstandard_methods=True
         )
-        
+
         assert response.code == 204
-    
+
     def test_404_for_unknown_path(self):
         """Should return 404 for unknown paths."""
         response = self.fetch(f"{BASE_PATH}/unknown/path")
-        
+
         assert response.code == 404
 
 
 class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
     """Integration tests for authentication endpoints."""
-    
+
     def get_app(self):
         """Create test application."""
         with patch("pyrest.server.get_config") as mock_config:
@@ -121,7 +124,7 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
             mock_config.return_value.base_path = "/pyrest"
             mock_config.return_value.auth_config_file = "auth_config.json"
             mock_config.return_value.get.return_value = None
-            
+
             with patch("pyrest.server.get_env"):
                 with patch("pyrest.server.AppLoader") as mock_loader:
                     mock_loader.return_value.load_all_apps.return_value = []
@@ -129,7 +132,7 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
                     mock_loader.return_value.isolated_apps = {}
                     mock_loader.return_value.get_embedded_apps.return_value = []
                     mock_loader.return_value.get_isolated_apps.return_value = []
-                    
+
                     with patch("pyrest.auth.get_auth_config") as mock_auth:
                         mock_auth.return_value.jwt_secret = "test-secret"
                         mock_auth.return_value.jwt_expiry_hours = 24
@@ -138,70 +141,65 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
                         mock_auth.return_value.client_id = ""
                         mock_auth.return_value.client_secret = ""
                         mock_auth.return_value.is_configured = False
-                        
+
                         return create_app()
-    
+
     def test_register_user(self):
         """Should register new user."""
         response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
-            body=json.dumps({
-                "username": "testuser",
-                "password": "testpass",
-                "email": "test@example.com"
-            }),
-            headers={"Content-Type": "application/json"}
+            body=json.dumps(
+                {"username": "testuser", "password": "testpass", "email": "test@example.com"}
+            ),
+            headers={"Content-Type": "application/json"},
         )
-        
+
         assert response.code == 201
-        
+
         data = json.loads(response.body)
         assert data["success"] is True
         assert data["data"]["username"] == "testuser"
-    
+
     def test_register_missing_fields(self):
         """Should reject registration with missing fields."""
         response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
             body=json.dumps({"username": "testuser"}),
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
-        
+
         assert response.code == 400
-    
+
     def test_login_invalid_credentials(self):
         """Should reject invalid credentials."""
         response = self.fetch(
             f"{BASE_PATH}/auth/login",
             method="POST",
-            body=json.dumps({
-                "username": "nonexistent",
-                "password": "wrong"
-            }),
-            headers={"Content-Type": "application/json"}
+            body=json.dumps({"username": "nonexistent", "password": "wrong"}),
+            headers={"Content-Type": "application/json"},
         )
-        
+
         assert response.code == 401
-    
+
     def test_auth_me_without_token(self):
         """Should reject /auth/me without token."""
         response = self.fetch(f"{BASE_PATH}/auth/me")
-        
+
         assert response.code == 401
-    
+
     def test_azure_login_not_configured(self):
         """Should return error if Azure AD not configured."""
         response = self.fetch(f"{BASE_PATH}/auth/azure/login")
-        
+
         # Should return error since Azure AD is not configured
         assert response.code == 500
 
 
 class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
     """End-to-end workflow tests."""
-    
+
     def get_app(self):
         """Create test application."""
         with patch("pyrest.server.get_config") as mock_config:
@@ -213,7 +211,7 @@ class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
             mock_config.return_value.base_path = "/pyrest"
             mock_config.return_value.auth_config_file = "auth_config.json"
             mock_config.return_value.get.return_value = None
-            
+
             with patch("pyrest.server.get_env"):
                 with patch("pyrest.server.AppLoader") as mock_loader:
                     mock_loader.return_value.load_all_apps.return_value = []
@@ -221,50 +219,43 @@ class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
                     mock_loader.return_value.isolated_apps = {}
                     mock_loader.return_value.get_embedded_apps.return_value = []
                     mock_loader.return_value.get_isolated_apps.return_value = []
-                    
+
                     with patch("pyrest.auth.get_auth_config") as mock_auth:
                         mock_auth.return_value.jwt_secret = "test-secret"
                         mock_auth.return_value.jwt_expiry_hours = 24
                         mock_auth.return_value.jwt_algorithm = "HS256"
                         mock_auth.return_value.is_configured = False
-                        
+
                         return create_app()
-    
+
     def test_register_login_access_flow(self):
         """Test complete user flow: register -> login -> access protected."""
         # 1. Register
         register_response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
-            body=json.dumps({
-                "username": "flowuser",
-                "password": "flowpass"
-            }),
-            headers={"Content-Type": "application/json"}
+            body=json.dumps({"username": "flowuser", "password": "flowpass"}),
+            headers={"Content-Type": "application/json"},
         )
         assert register_response.code == 201
-        
+
         # 2. Login
         login_response = self.fetch(
             f"{BASE_PATH}/auth/login",
             method="POST",
-            body=json.dumps({
-                "username": "flowuser",
-                "password": "flowpass"
-            }),
-            headers={"Content-Type": "application/json"}
+            body=json.dumps({"username": "flowuser", "password": "flowpass"}),
+            headers={"Content-Type": "application/json"},
         )
         assert login_response.code == 200
-        
+
         login_data = json.loads(login_response.body)
         token = login_data["data"]["access_token"]
-        
+
         # 3. Access protected endpoint
         me_response = self.fetch(
-            f"{BASE_PATH}/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
+            f"{BASE_PATH}/auth/me", headers={"Authorization": f"Bearer {token}"}
         )
         assert me_response.code == 200
-        
+
         me_data = json.loads(me_response.body)
         assert me_data["data"]["sub"] == "flowuser"

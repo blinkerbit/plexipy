@@ -4,6 +4,9 @@
 # Web Framework
 tornado>=6.4
 
+# Validation
+pydantic>=2.0.0
+
 # JWT Authentication
 PyJWT>=2.8.0
 
@@ -16,3 +19,6 @@ PyJWT>=2.8.0
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
+
+# Linting
+ruff>=0.1.0

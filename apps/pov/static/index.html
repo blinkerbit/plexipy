@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +18,13 @@
             --error: #dc322f;
             --cyan: #2aa198;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: var(--bg);
@@ -25,11 +32,13 @@
             line-height: 1.6;
             min-height: 100vh;
         }
+
         .container {
             max-width: 900px;
             margin: 0 auto;
             padding: 2rem 1.5rem;
         }
+
         header {
             display: flex;
             justify-content: space-between;
@@ -38,13 +47,18 @@
             padding-bottom: 1.5rem;
             margin-bottom: 2rem;
         }
+
         h1 {
             font-size: 1.5rem;
             font-weight: normal;
             color: var(--fg-bright);
             letter-spacing: 0.05em;
         }
-        h1 span { color: var(--fg-dim); }
+
+        h1 span {
+            color: var(--fg-dim);
+        }
+
         h2 {
             font-size: 0.85rem;
             font-weight: normal;
@@ -53,6 +67,7 @@
             color: var(--fg-dim);
             margin-bottom: 1rem;
         }
+
         .btn {
             background: var(--bg-alt);
             color: var(--fg);
@@ -63,51 +78,63 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
+
         .btn:hover {
             background: #0a4052;
             color: var(--fg-bright);
             border-color: var(--fg);
         }
+
         .btn.primary {
             border-color: var(--accent);
             color: var(--accent);
         }
+
         .btn.primary:hover {
             background: var(--accent);
             color: var(--bg);
         }
+
         .btn.success {
             border-color: var(--success);
             color: var(--success);
         }
+
         .btn.success:hover {
             background: var(--success);
             color: var(--bg);
         }
+
         .btn.warning {
             border-color: var(--warning);
             color: var(--warning);
         }
+
         .btn.warning:hover {
             background: var(--warning);
             color: var(--bg);
         }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         .btn-lg {
             padding: 0.75rem 1.5rem;
             font-size: 1rem;
         }
+
         .panel {
             background: var(--bg-alt);
             padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
+
         .form-group {
             margin-bottom: 1rem;
         }
+
         label {
             display: block;
             font-size: 0.75rem;
@@ -116,7 +143,9 @@
             color: var(--fg-dim);
             margin-bottom: 0.5rem;
         }
-        input, select {
+
+        input,
+        select {
             width: 100%;
             background: var(--bg);
             border: 1px solid var(--fg-dim);
@@ -125,35 +154,46 @@
             font-family: inherit;
             font-size: 0.9rem;
         }
-        input:focus, select:focus {
+
+        input:focus,
+        select:focus {
             outline: none;
             border-color: var(--accent);
         }
+
         .form-row {
             display: flex;
             gap: 1rem;
         }
-        .form-row .form-group { flex: 1; }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
         .status {
             padding: 0.75rem 1rem;
             margin-bottom: 1rem;
             font-size: 0.85rem;
         }
+
         .status.success {
             background: rgba(133, 153, 0, 0.1);
             border: 1px solid var(--success);
             color: var(--success);
         }
+
         .status.error {
             background: rgba(220, 50, 47, 0.1);
             border: 1px solid var(--error);
             color: var(--error);
         }
+
         .status.info {
             background: rgba(38, 139, 210, 0.1);
             border: 1px solid var(--accent);
             color: var(--accent);
         }
+
         .spinner {
             display: inline-block;
             width: 16px;
@@ -164,27 +204,43 @@
             animation: spin 0.8s linear infinite;
             margin-right: 0.5rem;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .fade-in {
             animation: fadeIn 0.3s ease-out forwards;
             opacity: 0;
         }
-        @keyframes fadeIn { to { opacity: 1; } }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
         .actions {
             display: flex;
             gap: 0.5rem;
             margin-top: 1rem;
         }
+
         a {
             color: var(--accent);
             text-decoration: none;
         }
+
         a:hover {
             text-decoration: underline;
         }
+
         .nav-link {
             font-size: 0.85rem;
         }
+
         .value-display {
             display: flex;
             align-items: center;
@@ -194,16 +250,19 @@
             border: 1px solid var(--fg-dim);
             margin-bottom: 0.5rem;
         }
+
         .value-label {
             color: var(--fg-dim);
             font-size: 0.85rem;
             min-width: 100px;
         }
+
         .value-number {
             font-size: 1.5rem;
             color: var(--cyan);
             font-weight: bold;
         }
+
         .value-coords {
             font-size: 0.75rem;
             color: var(--fg-dim);
@@ -212,28 +271,34 @@
             text-overflow: ellipsis;
             overflow: hidden;
         }
+
         .operator {
             font-size: 1.5rem;
             color: var(--fg-dim);
             text-align: center;
             padding: 0.25rem 0;
         }
+
         .result-row {
             background: rgba(133, 153, 0, 0.1);
             border-color: var(--success);
         }
+
         .result-row .value-number {
             color: var(--success);
         }
+
         .section-divider {
             border-top: 1px solid var(--bg-alt);
             margin: 1.5rem 0;
         }
+
         .mode-toggle {
             display: flex;
             gap: 0;
             margin-bottom: 1rem;
         }
+
         .mode-btn {
             flex: 1;
             padding: 0.5rem;
@@ -245,12 +310,17 @@
             font-size: 0.8rem;
             text-transform: uppercase;
         }
-        .mode-btn:first-child { border-right: none; }
+
+        .mode-btn:first-child {
+            border-right: none;
+        }
+
         .mode-btn.active {
             background: var(--accent);
             color: var(--bg);
             border-color: var(--accent);
         }
+
         .hint {
             font-size: 0.75rem;
             color: var(--fg-dim);
@@ -258,22 +328,23 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header class="fade-in">
             <h1>TM1 <span>POV</span></h1>
             <a href="/pyrest" class="btn nav-link">Back to PyRest</a>
         </header>
-        
+
         <div id="message-area"></div>
-        
+
         <!-- Connection Panel -->
         <div class="panel fade-in">
             <h2>TM1 Connection</h2>
-            
+
             <!-- Connection Type Toggle -->
             <div class="form-group">
-                <label>Connection Type</label>
+                <label for="connection-type">Connection Type</label>
                 <select id="connection-type" onchange="setConnectionType(this.value)">
                     <option value="onprem">On-Premise (Basic/CAM)</option>
                     <option value="cloud">IBM Cloud (API Key)</option>
@@ -282,62 +353,64 @@
                 </select>
                 <a href="/pyrest/pov/token-ui" style="font-size: 0.75rem; margin-left: 0.5rem;">Manage Tokens</a>
             </div>
-            
+
             <!-- On-Premise Fields -->
             <div id="onprem-fields">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Server Address</label>
+                        <label for="address">Server Address</label>
                         <input type="text" id="address" value="localhost" placeholder="tm1server.company.com">
                     </div>
                     <div class="form-group">
-                        <label>Port</label>
+                        <label for="port">Port</label>
                         <input type="number" id="port" value="8001">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Username</label>
+                        <label for="user">Username</label>
                         <input type="text" id="user" value="admin">
                     </div>
                     <div class="form-group">
-                        <label>Password</label>
+                        <label for="password">Password</label>
                         <input type="password" id="password">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>SSL</label>
+                        <label for="ssl">SSL</label>
                         <select id="ssl">
                             <option value="false">No</option>
                             <option value="true">Yes</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Namespace (CAM)</label>
+                        <label for="namespace">Namespace (CAM)</label>
                         <input type="text" id="namespace" placeholder="Leave empty for native auth">
                     </div>
                 </div>
             </div>
-            
+
             <!-- IBM Cloud Fields -->
             <div id="cloud-fields" style="display: none;">
                 <div class="form-group">
-                    <label>TM1 Server Base URL</label>
-                    <input type="text" id="base_url" placeholder="https://region.planning-analytics.cloud.ibm.com/api/tm1/v1">
+                    <label for="base_url">TM1 Server Base URL</label>
+                    <input type="text" id="base_url"
+                        placeholder="https://region.planning-analytics.cloud.ibm.com/api/tm1/v1">
                     <div class="hint">Full TM1 REST API base URL for your cloud instance</div>
                 </div>
                 <div class="form-group">
-                    <label>API Key</label>
+                    <label for="api_key">API Key</label>
                     <input type="password" id="api_key" placeholder="Your IBM Cloud API key">
                 </div>
             </div>
-            
+
             <!-- Azure AD Fields (TM1 v12) - OAuth2 Client Credentials Flow -->
             <div id="azure-fields" style="display: none;">
                 <div class="form-group">
-                    <label>TM1 Server Base URL</label>
-                    <input type="text" id="azure_base_url" placeholder="https://yourserver.planning-analytics.cloud.ibm.com/api/v0/tm1/...">
+                    <label for="azure_base_url">TM1 Server Base URL</label>
+                    <input type="text" id="azure_base_url"
+                        placeholder="https://yourserver.planning-analytics.cloud.ibm.com/api/v0/tm1/...">
                     <div class="hint">TM1 v12 REST API base URL</div>
                 </div>
                 <div class="section-divider"></div>
@@ -345,42 +418,43 @@
                     Azure AD App Registration (Service Principal)
                 </p>
                 <div class="form-group">
-                    <label>Tenant ID</label>
+                    <label for="tenant_id">Tenant ID</label>
                     <input type="text" id="tenant_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
                     <div class="hint">Azure AD directory (tenant) ID</div>
                 </div>
                 <div class="form-group">
-                    <label>Client ID (Application ID)</label>
+                    <label for="client_id">Client ID (Application ID)</label>
                     <input type="text" id="client_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
                     <div class="hint">App registration Application (client) ID</div>
                 </div>
                 <div class="form-group">
-                    <label>Client Secret</label>
+                    <label for="client_secret">Client Secret</label>
                     <input type="password" id="client_secret" placeholder="App registration client secret value">
                     <div class="hint">Secret value from Certificates & Secrets</div>
                 </div>
                 <div class="form-group">
-                    <label>Scope (Optional)</label>
+                    <label for="azure_scope">Scope (Optional)</label>
                     <input type="text" id="azure_scope" placeholder="Leave empty for default">
                     <div class="hint">OAuth2 scope. Default: {client_id}/.default</div>
                 </div>
                 <div style="background: var(--bg); padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem;">
                     <p style="font-size: 0.75rem; color: var(--cyan); margin: 0;">
-                        Uses OAuth2 Client Credentials flow to acquire access token from Azure AD, 
+                        Uses OAuth2 Client Credentials flow to acquire access token from Azure AD,
                         then connects to TM1 using the token.
                     </p>
                 </div>
             </div>
-            
+
             <!-- Token Fields (Pre-acquired) -->
             <div id="token-fields" style="display: none;">
                 <div class="form-group">
-                    <label>TM1 Server Base URL</label>
-                    <input type="text" id="token_base_url" placeholder="https://yourserver.planning-analytics.cloud.ibm.com/api/v0/tm1/...">
+                    <label for="token_base_url">TM1 Server Base URL</label>
+                    <input type="text" id="token_base_url"
+                        placeholder="https://yourserver.planning-analytics.cloud.ibm.com/api/v0/tm1/...">
                     <div class="hint">TM1 REST API base URL</div>
                 </div>
                 <div class="form-group">
-                    <label>Access Token</label>
+                    <label for="access_token">Access Token</label>
                     <textarea id="access_token" rows="4" placeholder="Paste your Azure AD access token here"></textarea>
                     <div class="hint">
                         <span id="token-status-hint"></span>
@@ -389,58 +463,59 @@
                 </div>
                 <div style="background: var(--bg); padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem;">
                     <p style="font-size: 0.75rem; color: var(--cyan); margin: 0;">
-                        Uses a pre-acquired access token. No token refresh is performed - get a new token when it expires.
+                        Uses a pre-acquired access token. No token refresh is performed - get a new token when it
+                        expires.
                     </p>
                 </div>
             </div>
-            
+
             <div class="actions">
                 <button class="btn primary" onclick="testConnection()">Test Connection</button>
             </div>
             <div id="connection-status" style="margin-top: 1rem;"></div>
         </div>
-        
+
         <!-- Cube & Elements Panel -->
         <div class="panel fade-in">
             <h2>Cube & Elements</h2>
             <div class="form-group">
-                <label>Cube Name</label>
+                <label for="cube">Cube Name</label>
                 <input type="text" id="cube" value="" placeholder="SalesCube">
             </div>
-            
+
             <div class="section-divider"></div>
-            
+
             <div class="form-group">
-                <label>Element 1 (Source)</label>
+                <label for="element1">Element 1 (Source)</label>
                 <input type="text" id="element1" placeholder="2024,North,Sales,Actual">
                 <div class="hint">Comma-separated element names in dimension order</div>
             </div>
-            
+
             <div class="form-group">
-                <label>Element 2 (Source)</label>
+                <label for="element2">Element 2 (Source)</label>
                 <input type="text" id="element2" placeholder="2024,South,Sales,Actual">
                 <div class="hint">Comma-separated element names in dimension order</div>
             </div>
-            
+
             <div class="form-group">
-                <label>Target Element (for sum result)</label>
+                <label for="target_element">Target Element (for sum result)</label>
                 <input type="text" id="target_element" placeholder="2024,Total,Sales,Actual">
                 <div class="hint">Where to write the sum of Element 1 + Element 2</div>
             </div>
         </div>
-        
+
         <!-- Operations Panel -->
         <div class="panel fade-in">
             <h2>Operations</h2>
-            
+
             <div class="actions" style="margin-bottom: 1.5rem;">
                 <button class="btn primary btn-lg" onclick="fetchValues()">Fetch Values</button>
                 <button class="btn warning btn-lg" onclick="addValues()">Add</button>
                 <button class="btn success btn-lg" onclick="updateTarget()">Update Target</button>
             </div>
-            
+
             <div id="operation-status"></div>
-            
+
             <!-- Values Display -->
             <div id="values-display" style="display: none;">
                 <div class="value-display">
@@ -448,17 +523,17 @@
                     <span class="value-number" id="value1">-</span>
                     <span class="value-coords" id="coords1"></span>
                 </div>
-                
+
                 <div class="operator">+</div>
-                
+
                 <div class="value-display">
                     <span class="value-label">Element 2:</span>
                     <span class="value-number" id="value2">-</span>
                     <span class="value-coords" id="coords2"></span>
                 </div>
-                
+
                 <div class="operator">=</div>
-                
+
                 <div class="value-display result-row">
                     <span class="value-label">Sum / Target:</span>
                     <span class="value-number" id="result">-</span>
@@ -466,7 +541,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- REST API Info -->
         <div class="panel fade-in">
             <h2>REST API</h2>
@@ -474,7 +549,8 @@
                 One-call endpoint: <code style="color: var(--cyan);">POST /pyrest/pov/calculate</code>
             </p>
             <p style="font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 0.5rem;">On-Premise Example:</p>
-            <pre style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright); margin-bottom: 1rem;">{
+            <pre
+                style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright); margin-bottom: 1rem;">{
   "connection_type": "onprem",
   "address": "localhost", "port": 8001,
   "user": "admin", "password": "secret", "ssl": false,
@@ -483,8 +559,10 @@
   "element2": "2024,South,Sales",
   "target_element": "2024,Total,Sales"
 }</pre>
-            <p style="font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 0.5rem;">TM1 v12 Azure AD Example (OAuth2 Client Credentials):</p>
-            <pre style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright); margin-bottom: 1rem;">{
+            <p style="font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 0.5rem;">TM1 v12 Azure AD Example (OAuth2
+                Client Credentials):</p>
+            <pre
+                style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright); margin-bottom: 1rem;">{
   "connection_type": "azure_ad",
   "base_url": "https://server.planning-analytics.cloud.ibm.com/api/v0/tm1/...",
   "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
@@ -497,7 +575,8 @@
   "target_element": "2024,Total,Sales"
 }</pre>
             <p style="font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 0.5rem;">Pre-acquired Token Example:</p>
-            <pre style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright);">{
+            <pre
+                style="background: var(--bg); padding: 1rem; font-size: 0.75rem; overflow-x: auto; color: var(--fg-bright);">{
   "connection_type": "token",
   "base_url": "https://server.planning-analytics.cloud.ibm.com/api/v0/tm1/...",
   "access_token": "eyJ0eXAiOiJKV1...",
@@ -507,7 +586,8 @@
   "target_element": "2024,Total,Sales"
 }</pre>
             <p style="font-size: 0.7rem; color: var(--cyan); margin-top: 0.5rem;">
-                Tip: Use <code>POST /pyrest/pov/token</code> to acquire a token once, then reuse it with <code>connection_type: "token"</code>.
+                Tip: Use <code>POST /pyrest/pov/token</code> to acquire a token once, then reuse it with
+                <code>connection_type: "token"</code>.
             </p>
         </div>
     </div>
@@ -515,45 +595,45 @@
     <script>
         var API_BASE = '/pyrest/pov';
         var connectionType = 'onprem';
-        
+
         // State
         var currentValues = {
             value1: null,
             value2: null,
             sum: null
         };
-        
+
         function setConnectionType(type) {
             connectionType = type;
-            
+
             document.getElementById('onprem-fields').style.display = type === 'onprem' ? 'block' : 'none';
             document.getElementById('cloud-fields').style.display = type === 'cloud' ? 'block' : 'none';
             document.getElementById('azure-fields').style.display = type === 'azure_ad' ? 'block' : 'none';
             document.getElementById('token-fields').style.display = type === 'token' ? 'block' : 'none';
-            
+
             // If switching to token mode, try to load saved token
             if (type === 'token') {
                 loadSavedToken();
             }
         }
-        
+
         function toggleAzureAuthFields() {
             // No longer needed - Azure AD now uses client credentials only
         }
-        
+
         function showMessage(text, type) {
             var area = document.getElementById('message-area');
             area.innerHTML = '<div class="status ' + type + '">' + text + '</div>';
-            setTimeout(function() { area.innerHTML = ''; }, 5000);
+            setTimeout(function () { area.innerHTML = ''; }, 5000);
         }
-        
+
         function showStatus(elementId, message, type) {
             document.getElementById(elementId).innerHTML = '<div class="status ' + type + '">' + message + '</div>';
         }
-        
+
         function getConnectionParams() {
             var params = { connection_type: connectionType };
-            
+
             if (connectionType === 'token') {
                 // Pre-acquired access token
                 params.base_url = document.getElementById('token_base_url').value;
@@ -564,7 +644,7 @@
                 params.tenant_id = document.getElementById('tenant_id').value;
                 params.client_id = document.getElementById('client_id').value;
                 params.client_secret = document.getElementById('client_secret').value;
-                
+
                 // Optional scope
                 var scope = document.getElementById('azure_scope').value;
                 if (scope) params.scope = scope;
@@ -575,44 +655,44 @@
             } else {
                 // On-Premise
                 params.address = document.getElementById('address').value || 'localhost';
-                params.port = parseInt(document.getElementById('port').value) || 8001;
+                params.port = Number.parseInt(document.getElementById('port').value) || 8001;
                 params.user = document.getElementById('user').value || 'admin';
                 params.password = document.getElementById('password').value;
                 params.ssl = document.getElementById('ssl').value === 'true';
                 var ns = document.getElementById('namespace').value;
                 if (ns) params.namespace = ns;
             }
-            
+
             return params;
         }
-        
+
         function testConnection() {
             showStatus('connection-status', '<span class="spinner"></span> Connecting...', 'info');
-            
+
             fetch(API_BASE + '/connect', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(getConnectionParams())
             })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    showStatus('connection-status', 
-                        'Connected to ' + data.data.server_name + ' (' + data.data.connection_type + ')', 'success');
-                } else {
-                    showStatus('connection-status', data.error, 'error');
-                }
-            })
-            .catch(function(e) {
-                showStatus('connection-status', 'Connection failed: ' + e.message, 'error');
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        showStatus('connection-status',
+                            'Connected to ' + data.data.server_name + ' (' + data.data.connection_type + ')', 'success');
+                    } else {
+                        showStatus('connection-status', data.error, 'error');
+                    }
+                })
+                .catch(function (e) {
+                    showStatus('connection-status', 'Connection failed: ' + e.message, 'error');
+                });
         }
-        
+
         function fetchValues() {
             var cube = document.getElementById('cube').value;
             var element1 = document.getElementById('element1').value.trim();
             var element2 = document.getElementById('element2').value.trim();
-            
+
             if (!cube) {
                 showMessage('Please enter a cube name', 'error');
                 return;
@@ -621,114 +701,114 @@
                 showMessage('Please enter Element 1 and Element 2', 'error');
                 return;
             }
-            
+
             showStatus('operation-status', '<span class="spinner"></span> Fetching values...', 'info');
-            
+
             var params = getConnectionParams();
             params.cube = cube;
             params.element1 = element1;
             params.element2 = element2;
-            
+
             fetch(API_BASE + '/fetch', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(params)
             })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    currentValues.value1 = data.data.element1.value;
-                    currentValues.value2 = data.data.element2.value;
-                    currentValues.sum = null;
-                    
-                    document.getElementById('values-display').style.display = 'block';
-                    document.getElementById('value1').textContent = formatNumber(currentValues.value1);
-                    document.getElementById('value2').textContent = formatNumber(currentValues.value2);
-                    document.getElementById('coords1').textContent = element1;
-                    document.getElementById('coords2').textContent = element2;
-                    document.getElementById('result').textContent = '-';
-                    document.getElementById('coords-target').textContent = '';
-                    
-                    showStatus('operation-status', 'Values fetched successfully', 'success');
-                } else {
-                    showStatus('operation-status', data.error, 'error');
-                }
-            })
-            .catch(function(e) {
-                showStatus('operation-status', 'Fetch failed: ' + e.message, 'error');
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        currentValues.value1 = data.data.element1.value;
+                        currentValues.value2 = data.data.element2.value;
+                        currentValues.sum = null;
+
+                        document.getElementById('values-display').style.display = 'block';
+                        document.getElementById('value1').textContent = formatNumber(currentValues.value1);
+                        document.getElementById('value2').textContent = formatNumber(currentValues.value2);
+                        document.getElementById('coords1').textContent = element1;
+                        document.getElementById('coords2').textContent = element2;
+                        document.getElementById('result').textContent = '-';
+                        document.getElementById('coords-target').textContent = '';
+
+                        showStatus('operation-status', 'Values fetched successfully', 'success');
+                    } else {
+                        showStatus('operation-status', data.error, 'error');
+                    }
+                })
+                .catch(function (e) {
+                    showStatus('operation-status', 'Fetch failed: ' + e.message, 'error');
+                });
         }
-        
+
         function addValues() {
             if (currentValues.value1 === null || currentValues.value2 === null) {
                 showMessage('Please fetch values first', 'error');
                 return;
             }
-            
+
             currentValues.sum = currentValues.value1 + currentValues.value2;
-            
+
             var target = document.getElementById('target_element').value.trim();
             document.getElementById('result').textContent = formatNumber(currentValues.sum);
             document.getElementById('coords-target').textContent = target || '(set target element)';
-            
-            showStatus('operation-status', 
-                formatNumber(currentValues.value1) + ' + ' + formatNumber(currentValues.value2) + 
+
+            showStatus('operation-status',
+                formatNumber(currentValues.value1) + ' + ' + formatNumber(currentValues.value2) +
                 ' = ' + formatNumber(currentValues.sum), 'success');
         }
-        
+
         function updateTarget() {
             if (currentValues.sum === null) {
                 showMessage('Please add values first', 'error');
                 return;
             }
-            
+
             var cube = document.getElementById('cube').value;
             var target = document.getElementById('target_element').value.trim();
-            
+
             if (!target) {
                 showMessage('Please enter target element', 'error');
                 return;
             }
-            
+
             showStatus('operation-status', '<span class="spinner"></span> Updating target...', 'info');
-            
+
             var params = getConnectionParams();
             params.cube = cube;
             params.target_element = target;
             params.value = currentValues.sum;
-            
+
             fetch(API_BASE + '/update', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(params)
             })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    showStatus('operation-status', 
-                        'Updated! Written: ' + formatNumber(data.data.written_value) + 
-                        ', Confirmed: ' + formatNumber(data.data.confirmed_value), 'success');
-                    document.getElementById('result').textContent = formatNumber(data.data.confirmed_value);
-                } else {
-                    showStatus('operation-status', data.error, 'error');
-                }
-            })
-            .catch(function(e) {
-                showStatus('operation-status', 'Update failed: ' + e.message, 'error');
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        showStatus('operation-status',
+                            'Updated! Written: ' + formatNumber(data.data.written_value) +
+                            ', Confirmed: ' + formatNumber(data.data.confirmed_value), 'success');
+                        document.getElementById('result').textContent = formatNumber(data.data.confirmed_value);
+                    } else {
+                        showStatus('operation-status', data.error, 'error');
+                    }
+                })
+                .catch(function (e) {
+                    showStatus('operation-status', 'Update failed: ' + e.message, 'error');
+                });
         }
-        
+
         function formatNumber(value) {
             if (value === null || value === undefined) return '-';
             if (typeof value === 'number') {
-                return value.toLocaleString(undefined, {maximumFractionDigits: 2});
+                return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
             }
             return String(value);
         }
-        
+
         // Token management
         var TOKEN_STORAGE_KEY = 'pov_azure_token';
-        
+
         function loadSavedToken() {
             var saved = localStorage.getItem(TOKEN_STORAGE_KEY);
             if (saved) {
@@ -736,15 +816,15 @@
                     var data = JSON.parse(saved);
                     var tokenField = document.getElementById('access_token');
                     var statusHint = document.getElementById('token-status-hint');
-                    
+
                     // Check if token is expired
                     var acquiredDate = new Date(data.acquired_at);
                     var expiresAt = new Date(acquiredDate.getTime() + (data.expires_in * 1000));
                     var now = new Date();
                     var isExpired = now > expiresAt;
-                    
+
                     tokenField.value = data.token;
-                    
+
                     if (isExpired) {
                         statusHint.innerHTML = '<span style="color: var(--error);">Token expired - </span>';
                     } else {
@@ -756,9 +836,9 @@
                 }
             }
         }
-        
+
         // Check for use_token parameter on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             var urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('use_token') === '1') {
                 // Switch to token mode and load saved token
@@ -769,4 +849,5 @@
         });
     </script>
 </body>
+
 </html>

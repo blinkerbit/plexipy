@@ -1,19 +1,23 @@
 """
 Process Manager for PyRest framework.
-Handles spawning and managing isolated app processes.
+Fully async -- uses asyncio for sleep, subprocess wait, and child-PID discovery.
+
+Tornado isolated apps fork multiple worker processes (default 8).
+This manager tracks the parent PID and discovers child worker PIDs
+via /proc on Linux, killing the entire process group on stop.
 """
 
+import asyncio
+import atexit
+import contextlib
+import logging
 import os
-import sys
 import signal
 import subprocess
-import logging
-import atexit
-from pathlib import Path
-from typing import Dict, Optional, List, Any
-from dataclasses import dataclass, field
-import threading
 import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 from .config import get_config
 from .venv_manager import get_venv_manager
@@ -21,81 +25,169 @@ from .venv_manager import get_venv_manager
 logger = logging.getLogger("pyrest.process_manager")
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_child_pids(parent_pid: int) -> list[int]:
+    """
+    Get all child PIDs of a given parent PID (sync, fast).
+    Uses /proc on Linux to discover Tornado worker forks.
+    """
+    children: list[int] = []
+    try:
+        proc_path = Path("/proc")
+        if not proc_path.exists():
+            # Fallback: use ps command (sync, fast)
+            result = subprocess.run(
+                ["ps", "--ppid", str(parent_pid), "-o", "pid="],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().splitlines():
+                    line = line.strip()
+                    if line.isdigit():
+                        children.append(int(line))
+            return children
+
+        # Scan /proc for children (very fast on Linux)
+        for entry in proc_path.iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                stat_file = entry / "stat"
+                if stat_file.exists():
+                    stat_content = stat_file.read_text()
+                    close_paren = stat_content.rfind(")")
+                    if close_paren > 0:
+                        fields = stat_content[close_paren + 2 :].split()
+                        if len(fields) >= 2 and int(fields[1]) == parent_pid:
+                            children.append(int(entry.name))
+            except (PermissionError, FileNotFoundError, ValueError, IndexError):
+                continue
+    except Exception as e:
+        logger.debug(f"Error scanning child PIDs for {parent_pid}: {e}")
+    return children
+
+
+def _pid_alive(pid: int) -> bool:
+    """Check if a PID is alive."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+# ---------------------------------------------------------------------------
+# AppProcess dataclass
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class AppProcess:
-    """Represents a running isolated app process."""
+    """Represents a running isolated app process (parent + forked workers)."""
+
     name: str
     port: int
     process: subprocess.Popen
     app_path: Path
-    venv_path: Optional[Path] = None
+    venv_path: Path | None = None
     started_at: float = field(default_factory=time.time)
-    
+
     @property
     def is_running(self) -> bool:
-        """Check if the process is still running."""
+        """Whether the app process is still running."""
         return self.process.poll() is None
-    
+
     @property
-    def pid(self) -> Optional[int]:
-        """Get the process ID."""
+    def pid(self) -> int | None:
+        """The parent process ID, or None if no process exists."""
         return self.process.pid if self.process else None
-    
+
     @property
-    def return_code(self) -> Optional[int]:
-        """Get the return code if process has exited."""
+    def child_pids(self) -> list[int]:
+        """PIDs of forked Tornado worker processes."""
+        if not self.is_running or not self.pid:
+            return []
+        return _get_child_pids(self.pid)
+
+    @property
+    def all_pids(self) -> list[int]:
+        """All PIDs (parent + workers) for this app."""
+        pids: list[int] = []
+        if self.pid:
+            pids.append(self.pid)
+        pids.extend(self.child_pids)
+        return pids
+
+    @property
+    def total_processes(self) -> int:
+        """Total number of running processes (parent + workers)."""
+        return len(self.all_pids)
+
+    @property
+    def return_code(self) -> int | None:
+        """The process exit code, or None if still running."""
         return self.process.poll()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary representation."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the app process state to a dictionary."""
+        children = self.child_pids
         return {
             "name": self.name,
             "port": self.port,
             "pid": self.pid,
+            "child_pids": children,
+            "total_processes": 1 + len(children) if self.is_running else 0,
             "is_running": self.is_running,
             "app_path": str(self.app_path),
             "venv_path": str(self.venv_path) if self.venv_path else None,
             "started_at": self.started_at,
-            "return_code": self.return_code
+            "return_code": self.return_code,
         }
+
+
+# ---------------------------------------------------------------------------
+# ProcessManager (async)
+# ---------------------------------------------------------------------------
 
 
 class ProcessManager:
     """
     Manages isolated app processes.
-    Spawns apps as subprocesses and tracks their status.
+    spawn_app and stop_app are async to avoid blocking the event loop.
     """
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.config = get_config()
         self.venv_manager = get_venv_manager()
-        self._processes: Dict[str, AppProcess] = {}
-        self._next_port = self.config.isolated_app_base_port
-        self._port_lock = threading.Lock()
-        
-        # Register cleanup on exit
-        atexit.register(self.shutdown_all)
-    
+        self._processes: dict[str, AppProcess] = {}
+        self._next_port: int = self.config.isolated_app_base_port
+
+        # Register sync cleanup on interpreter exit
+        atexit.register(self._sync_shutdown_all)
+
     def get_next_port(self) -> int:
-        """Get the next available port for an isolated app."""
-        with self._port_lock:
-            port = self._next_port
-            self._next_port += 1
-            return port
-    
-    def assign_port(self, app_name: str, preferred_port: Optional[int] = None) -> int:
-        """
-        Assign a port to an app.
-        
+        """Return the next available port and increment the counter."""
+        port = self._next_port
+        self._next_port += 1
+        return port
+
+    def assign_port(self, app_name: str, preferred_port: int | None = None) -> int:
+        """Assign a port to an app, using the preferred port if available.
+
         Args:
-            app_name: Name of the app
-            preferred_port: Preferred port number (if available)
-            
+            app_name: Name of the app requesting a port.
+            preferred_port: Desired port number, or None for auto-assign.
+
         Returns:
-            Assigned port number
+            The assigned port number.
         """
         if preferred_port is not None:
-            # Check if port is already in use by another app
             for name, proc in self._processes.items():
                 if proc.port == preferred_port and name != app_name:
                     logger.warning(
@@ -104,240 +196,237 @@ class ProcessManager:
                     )
                     return self.get_next_port()
             return preferred_port
-        
         return self.get_next_port()
-    
-    def spawn_app(
+
+    # ------------------------------------------------------------------
+    # Async: spawn
+    # ------------------------------------------------------------------
+
+    async def spawn_app(
         self,
         app_name: str,
         app_path: Path,
         port: int,
-        venv_path: Optional[Path] = None
-    ) -> Optional[AppProcess]:
+        venv_path: Path | None = None,
+    ) -> AppProcess | None:
         """
-        Spawn an isolated app as a subprocess.
-        
-        Args:
-            app_name: Name of the app
-            app_path: Path to the app directory
-            port: Port number to run the app on
-            venv_path: Path to the virtual environment (optional)
-            
-        Returns:
-            AppProcess object if successful, None otherwise
+        Async: spawn an isolated app as a subprocess.
+        Uses asyncio.sleep instead of time.sleep for the startup check.
         """
-        # Resolve all paths to absolute for reliable operations in Docker
         app_path = Path(app_path).resolve()
-        
-        # Check if app is already running
+
+        # Already running?
         if app_name in self._processes:
             existing = self._processes[app_name]
             if existing.is_running:
-                logger.warning(f"App {app_name} is already running on port {existing.port}")
+                logger.warning(f"App {app_name} already running on port {existing.port}")
                 return existing
-            else:
-                # Clean up dead process
-                del self._processes[app_name]
-        
-        # Get the isolated app runner script path
-        runner_script = Path(__file__).parent / "templates" / "isolated_app.py"
-        runner_script = runner_script.resolve()
-        
+            del self._processes[app_name]
+
+        # Runner script
+        runner_script = (Path(__file__).parent / "templates" / "isolated_app.py").resolve()
         if not runner_script.exists():
             logger.error(f"Isolated app runner not found at {runner_script}")
             return None
-        
-        # Determine Python executable
-        # IMPORTANT: For isolated apps, we MUST use the venv's Python, not system Python
-        # The venv should be in the app folder: {app_path}/.venv
-        if venv_path:
-            venv_path = Path(venv_path).resolve()
-            if not venv_path.exists():
-                logger.error(
-                    f"Venv path does not exist: {venv_path}. "
-                    f"Cannot start isolated app without venv. "
-                    f"Expected venv location: {app_path}/.venv (inside app folder)"
-                )
-                return None
-            
-            # Get venv Python (don't resolve symlinks - venv python sets up paths correctly)
-            python_exe = self.venv_manager.get_python_executable(venv_path)
-            
-            if not python_exe.exists():
-                logger.error(
-                    f"Python executable not found at {python_exe} in venv {venv_path}. "
-                    f"Venv may be invalid or corrupted. Cannot start isolated app."
-                )
-                return None
-            
-            logger.info(f"Using venv Python for isolated app '{app_name}': {python_exe}")
-        else:
-            # No venv_path provided - this should not happen for isolated apps
-            logger.error(
-                f"No venv_path provided for isolated app '{app_name}'. "
-                f"Isolated apps require a venv. Cannot start."
-            )
+
+        # Python executable
+        if not venv_path:
+            logger.error(f"No venv_path for isolated app '{app_name}'. Cannot start.")
             return None
-        
-        # Build environment variables
+
+        venv_path = Path(venv_path).resolve()
+        if not venv_path.exists():
+            logger.error(f"Venv path does not exist: {venv_path}")
+            return None
+
+        python_exe = self.venv_manager.get_python_executable(venv_path)
+        if not python_exe.exists():
+            logger.error(f"Python not found at {python_exe}")
+            return None
+
+        logger.info(f"Using venv Python for '{app_name}': {python_exe}")
+
+        # Environment
         env = os.environ.copy()
-        env["PYREST_APP_NAME"] = app_name
-        env["PYREST_APP_PATH"] = str(app_path)
-        env["PYREST_APP_PORT"] = str(port)
-        env["PYREST_MAIN_PORT"] = str(self.config.port)
-        env["PYREST_BASE_PATH"] = self.config.base_path
-        env["PYREST_AUTH_CONFIG"] = str(Path(self.config.auth_config_file).absolute())
-        
-        if venv_path:
-            venv_path = Path(venv_path).resolve()
-            env["VIRTUAL_ENV"] = str(venv_path)
-            # Add venv's bin directory to PATH (Linux)
-            venv_bin = venv_path / "bin"
-            if venv_bin.exists():
-                current_path = env.get("PATH", "")
-                env["PATH"] = f"{venv_bin}:{current_path}"
-                logger.debug(f"Added venv bin to PATH: {venv_bin}")
-        
+        env.update(
+            {
+                "PYREST_APP_NAME": app_name,
+                "PYREST_APP_PATH": str(app_path),
+                "PYREST_APP_PORT": str(port),
+                "PYREST_MAIN_PORT": str(self.config.port),
+                "PYREST_BASE_PATH": self.config.base_path,
+                "PYREST_AUTH_CONFIG": str(Path(self.config.auth_config_file).absolute()),
+                "VIRTUAL_ENV": str(venv_path),
+            }
+        )
+        venv_bin = venv_path / "bin"
+        if venv_bin.exists():
+            env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"
+
         try:
-            logger.info(f"Spawning isolated app '{app_name}' on port {port}")
             logger.info(
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                f"Spawning '{app_name}' on port {port} | "
+                f"python={python_exe} | runner={runner_script}"
             )
-            logger.info(
-                f"Python executable path for isolated app '{app_name}': {python_exe}"
-            )
-            logger.info(
-                f"Venv path for isolated app '{app_name}': {venv_path if venv_path else 'None (using system Python)'}"
-            )
-            logger.info(
-                f"App path for isolated app '{app_name}': {app_path}"
-            )
-            logger.info(
-                f"Runner script for isolated app '{app_name}': {runner_script}"
-            )
-            logger.info(
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            logger.debug(f"Full command: {python_exe} {runner_script}")
-            
-            # Spawn the process (Linux Docker container)
+
+            # Popen is appropriate for long-running background processes.
+            # start_new_session=True so we can killpg the whole group later.
             process = subprocess.Popen(
                 [str(python_exe), str(runner_script)],
                 cwd=str(app_path),
                 env=env,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                start_new_session=True,
             )
-            
-            # Wait briefly to check if process started successfully
-            time.sleep(0.5)
-            
+
+            # Non-blocking startup check
+            await asyncio.sleep(0.5)
+
             if process.poll() is not None:
-                # Process already exited
-                stdout, stderr = process.communicate()
+                _stdout, stderr = process.communicate()
                 logger.error(
                     f"App {app_name} failed to start. "
                     f"Exit code: {process.returncode}. "
-                    f"Stderr: {stderr.decode() if stderr else 'N/A'}"
+                    f"Stderr: {stderr.decode(errors='replace') if stderr else 'N/A'}"
                 )
                 return None
-            
-            # Create and store AppProcess
+
             app_process = AppProcess(
                 name=app_name,
                 port=port,
                 process=process,
                 app_path=app_path,
-                venv_path=venv_path
+                venv_path=venv_path,
             )
-            
             self._processes[app_name] = app_process
-            logger.info(f"App '{app_name}' started successfully on port {port} (PID: {process.pid})")
-            
+            logger.info(f"App '{app_name}' started on port {port} (PID: {process.pid})")
             return app_process
-            
+
         except Exception as e:
-            logger.error(f"Failed to spawn app {app_name}: {e}")
+            logger.exception(f"Failed to spawn app {app_name}: {e}")
             return None
-    
-    def stop_app(self, app_name: str, timeout: float = 5.0) -> bool:
+
+    # ------------------------------------------------------------------
+    # Async: stop
+    # ------------------------------------------------------------------
+
+    async def stop_app(self, app_name: str, timeout: float = 5.0) -> bool:
         """
-        Stop a running app.
-        
-        Args:
-            app_name: Name of the app to stop
-            timeout: Timeout in seconds before force killing
-            
-        Returns:
-            True if stopped successfully
+        Async: stop a running app and ALL its forked worker processes.
+        Uses asyncio.to_thread for the blocking process.wait().
         """
         if app_name not in self._processes:
             logger.warning(f"App {app_name} is not running")
             return False
-        
+
         app_process = self._processes[app_name]
-        
         if not app_process.is_running:
             del self._processes[app_name]
             return True
-        
+
         try:
-            logger.info(f"Stopping app {app_name} (PID: {app_process.pid})")
-            
-            # Try graceful shutdown first
-            app_process.process.terminate()
-            
+            parent_pid = app_process.pid
+            children = app_process.child_pids
+            logger.info(
+                f"Stopping {app_name} (parent PID: {parent_pid}, "
+                f"workers: {len(children)}, PIDs: {children})"
+            )
+
+            # SIGTERM to entire process group
             try:
-                app_process.process.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
+                pgid = os.getpgid(parent_pid)
+                os.killpg(pgid, signal.SIGTERM)
+                logger.info(f"Sent SIGTERM to process group {pgid}")
+            except (OSError, ProcessLookupError):
+                app_process.process.terminate()
+
+            # Non-blocking wait for parent to exit
+            try:
+                await asyncio.wait_for(
+                    asyncio.to_thread(app_process.process.wait),
+                    timeout=timeout,
+                )
+            except TimeoutError:
                 logger.warning(f"App {app_name} didn't stop gracefully, force killing")
-                app_process.process.kill()
-                app_process.process.wait()
-            
+                try:
+                    pgid = os.getpgid(parent_pid)
+                    os.killpg(pgid, signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    app_process.process.kill()
+                await asyncio.to_thread(app_process.process.wait)
+
+            # Kill straggler workers
+            for child_pid in children:
+                if _pid_alive(child_pid):
+                    logger.warning(f"Killing straggler worker PID {child_pid}")
+                    with contextlib.suppress(OSError, ProcessLookupError):
+                        os.kill(child_pid, signal.SIGKILL)
+
             del self._processes[app_name]
-            logger.info(f"App {app_name} stopped")
+            logger.info(f"App {app_name} stopped (all processes terminated)")
             return True
-            
+
         except Exception as e:
-            logger.error(f"Error stopping app {app_name}: {e}")
+            logger.exception(f"Error stopping app {app_name}: {e}")
+            self._processes.pop(app_name, None)
             return False
-    
-    def shutdown_all(self):
-        """Shutdown all running app processes."""
+
+    # ------------------------------------------------------------------
+    # Async: shutdown all
+    # ------------------------------------------------------------------
+
+    async def shutdown_all(self) -> None:
+        """Async: shutdown all running app processes."""
         logger.info("Shutting down all isolated apps...")
-        
-        for app_name in list(self._processes.keys()):
-            self.stop_app(app_name)
-        
+        for app_name in list(self._processes):
+            await self.stop_app(app_name)
         logger.info("All isolated apps stopped")
-    
-    def get_running_apps(self) -> List[AppProcess]:
-        """Get list of all running app processes."""
-        # Clean up any dead processes
-        dead_apps = [
-            name for name, proc in self._processes.items() 
-            if not proc.is_running
-        ]
-        for name in dead_apps:
+
+    def _sync_shutdown_all(self) -> None:
+        """Sync fallback for atexit (no event loop available)."""
+        for app_name in list(self._processes):
+            app_process = self._processes.get(app_name)
+            if app_process and app_process.is_running:
+                try:
+                    if hasattr(os, "getpgid"):
+                        pgid = os.getpgid(app_process.pid)
+                        os.killpg(pgid, signal.SIGTERM)
+                    else:
+                        app_process.process.terminate()
+                except (OSError, ProcessLookupError):
+                    app_process.process.terminate()
+                try:
+                    app_process.process.wait(timeout=3)
+                except Exception:
+                    app_process.process.kill()
+        self._processes.clear()
+
+    # ------------------------------------------------------------------
+    # Status queries (sync -- fast, no I/O)
+    # ------------------------------------------------------------------
+
+    def get_running_apps(self) -> list[AppProcess]:
+        """Return all currently running app processes, pruning dead ones."""
+        dead = [n for n, p in self._processes.items() if not p.is_running]
+        for name in dead:
             logger.info(f"Cleaning up dead process for app {name}")
             del self._processes[name]
-        
         return list(self._processes.values())
-    
-    def get_app_status(self, app_name: str) -> Optional[Dict[str, Any]]:
-        """Get the status of a specific app."""
+
+    def get_app_status(self, app_name: str) -> dict[str, Any] | None:
+        """Get the status dict for a specific app, or None if not found."""
         if app_name not in self._processes:
             return None
-        
         return self._processes[app_name].to_dict()
-    
-    def get_all_status(self) -> List[Dict[str, Any]]:
-        """Get status of all managed apps."""
-        return [proc.to_dict() for proc in self.get_running_apps()]
+
+    def get_all_status(self) -> list[dict[str, Any]]:
+        """Get status dicts for all running app processes."""
+        return [p.to_dict() for p in self.get_running_apps()]
 
 
-# Singleton instance
-_process_manager: Optional[ProcessManager] = None
+# Singleton
+_process_manager: ProcessManager | None = None
 
 
 def get_process_manager() -> ProcessManager:

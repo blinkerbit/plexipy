@@ -1,0 +1,6 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "blinkerbit",
+        "projectKey": "blinkerbit_plexipy"
+    }
+}

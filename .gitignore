@@ -13,3 +13,14 @@ coverage.xml
 .env
 .venv
 logs
+hadolint-report.txt
+
+# MCP config (contains tokens/secrets)
+.cursor/
+
+# Generated nginx config (created at runtime)
+nginx/pyrest_generated.conf
+
+# Binary archives
+*.7z
+*.zip

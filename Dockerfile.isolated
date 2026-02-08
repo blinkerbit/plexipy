@@ -1,49 +1,78 @@
-# Dockerfile for Isolated PyRest Apps
-# Use this as a base for apps that need their own dependencies
+# Dockerfile for Isolated PyRest Apps (AKS per-app deployment)
+# Builds a standalone container for a single isolated app.
+#
+# Usage:
+#   docker build -f Dockerfile.isolated --build-arg APP_NAME=tm1data -t pyrest-tm1data .
+#   docker build -f Dockerfile.isolated --build-arg APP_NAME=pov --build-arg APP_PORT=8002 -t pyrest-pov .
+#
+# Air-gapped / Internal PyPI Proxy:
+#   docker build -f Dockerfile.isolated \
+#     --build-arg APP_NAME=tm1data \
+#     --build-arg PIP_INDEX_URL=https://pypi.internal.company.com/simple/ \
+#     --build-arg PIP_TRUSTED_HOST=pypi.internal.company.com \
+#     -t pyrest-tm1data .
 
-ARG PYTHON_VERSION=3.11
+FROM python:3.14-alpine
 
-FROM python:${PYTHON_VERSION}-slim
+# Build arguments
+ARG APP_NAME=myapp
+ARG APP_PORT=8001
+ARG PIP_INDEX_URL=""
+ARG PIP_TRUSTED_HOST=""
 
-# Labels
-LABEL maintainer="PyRest Team"
-LABEL description="PyRest Isolated App Container"
+# Labels (single instruction = single layer)
+LABEL maintainer="PyRest Team" \
+      description="PyRest Isolated App: ${APP_NAME}" \
+      version="1.0.0"
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONFAULTHANDLER=1
-
-# Build arguments for app configuration
-ARG APP_NAME=myapp
-ARG APP_PORT=8001
-
-ENV PYREST_APP_NAME=${APP_NAME} \
+    PYTHONFAULTHANDLER=1 \
+    PYREST_APP_NAME=${APP_NAME} \
     PYREST_APP_PORT=${APP_PORT} \
-    PYREST_APP_PATH=/app \
-    PYREST_BASE_PATH=/pyrest
+    PYREST_APP_PATH=/app/appdir \
+    PYREST_BASE_PATH=/pyrest \
+    PYREST_NUM_PROCESSES=8 \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
-# Create non-root user
-RUN groupadd --gid 1000 pyrest && \
-    useradd --uid 1000 --gid pyrest --shell /bin/bash --create-home pyrest
+# Install runtime deps and create non-root user
+RUN apk add --no-cache \
+        bash \
+    && addgroup -g 1000 pyrest \
+    && adduser -u 1000 -G pyrest -s /bin/bash -D pyrest
 
 WORKDIR /app
 
-# Install base dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir tornado>=6.4 PyJWT>=2.8.0
+# Install build deps, base Python packages (production only), then strip build deps
+# Uses .build-deps virtual package so apk del removes them cleanly (~150 MB saved)
+# hadolint ignore=DL3013,DL3018
+RUN apk add --no-cache --virtual .build-deps \
+        gcc \
+        musl-dev \
+        python3-dev \
+        libffi-dev \
+        openssl-dev \
+    && pip install --no-cache-dir uv \
+    && uv pip install --system --no-cache \
+        'tornado>=6.4' 'pydantic>=2.0.0' 'PyJWT>=2.8.0' \
+    && apk del --no-network .build-deps
 
-# Copy framework templates (needed for isolated app runner)
-COPY --chown=pyrest:pyrest pyrest/templates/ ./pyrest/templates/
-COPY --chown=pyrest:pyrest pyrest/handlers.py ./pyrest/
-COPY --chown=pyrest:pyrest pyrest/__init__.py ./pyrest/
+# Copy shared pyrest framework modules (single layer instead of 10 separate COPYs)
+COPY --chown=pyrest:pyrest --chmod=755 pyrest/ ./pyrest/
 
-# Copy app files (override in docker-compose or build args)
-# These will be mounted or copied when building specific app images
-COPY --chown=pyrest:pyrest apps/${APP_NAME}/ ./
+# Copy the specific app's files
+COPY --chown=pyrest:pyrest --chmod=755 apps/${APP_NAME}/ ./appdir/
 
 # Install app-specific requirements if present
-RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+# hadolint ignore=DL3018
+RUN if [ -f ./appdir/requirements.txt ]; then \
+        apk add --no-cache --virtual .app-build-deps \
+            gcc musl-dev python3-dev libffi-dev openssl-dev \
+        && uv pip install --system --no-cache -r ./appdir/requirements.txt \
+        && apk del --no-network .app-build-deps; \
+    fi
 
 # Switch to non-root user
 USER pyrest
@@ -51,9 +80,9 @@ USER pyrest
 # Expose app port
 EXPOSE ${APP_PORT}
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PYREST_APP_PORT}/pyrest/${PYREST_APP_NAME}/health')" || exit 1
+# Health check using the app's actual health endpoint
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://localhost:${PYREST_APP_PORT}/pyrest/${PYREST_APP_NAME}/health || exit 1
 
-# Run the isolated app
+# Run the isolated app using the framework's runner
 CMD ["python", "pyrest/templates/isolated_app.py"]

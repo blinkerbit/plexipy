@@ -1,0 +1,129 @@
+# Template: Isolated App Deployment
+# Copy this file and replace ${APP_NAME} with the actual app name.
+#
+# KEDA will scale this deployment between 0 and maxReplicas based on HTTP traffic.
+# When no traffic arrives for the cooldown period, it scales to zero (zero cost).
+#
+# Replace these placeholders:
+#   ${APP_NAME}    - e.g., tm1data, pov, tm1query
+#   ${ACR_REGISTRY} - e.g., myregistry.azurecr.io
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pyrest-${APP_NAME}
+  namespace: pyrest
+  labels:
+    app: pyrest-${APP_NAME}
+    app.kubernetes.io/name: pyrest-${APP_NAME}
+    app.kubernetes.io/component: isolated-app
+    app.kubernetes.io/part-of: pyrest
+spec:
+  # Replicas managed by KEDA -- do not set manually
+  replicas: 0
+  selector:
+    matchLabels:
+      app: pyrest-${APP_NAME}
+  template:
+    metadata:
+      labels:
+        app: pyrest-${APP_NAME}
+        app.kubernetes.io/name: pyrest-${APP_NAME}
+        app.kubernetes.io/component: isolated-app
+    spec:
+      containers:
+        - name: app
+          image: ${ACR_REGISTRY}/pyrest-${APP_NAME}:latest
+          ports:
+            - containerPort: 8001
+              name: http
+              protocol: TCP
+          env:
+            - name: PYREST_APP_NAME
+              value: "${APP_NAME}"
+            - name: PYREST_APP_PORT
+              value: "8001"
+            - name: PYREST_APP_PATH
+              value: "/app/appdir"
+            - name: PYREST_BASE_PATH
+              value: "/pyrest"
+            - name: PYREST_NUM_PROCESSES
+              value: "4"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /pyrest/${APP_NAME}/health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /pyrest/${APP_NAME}/health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+# Template: Isolated App Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: pyrest-${APP_NAME}
+  namespace: pyrest
+  labels:
+    app: pyrest-${APP_NAME}
+    app.kubernetes.io/name: pyrest-${APP_NAME}
+    app.kubernetes.io/component: isolated-app
+    app.kubernetes.io/part-of: pyrest
+spec:
+  type: ClusterIP
+  selector:
+    app: pyrest-${APP_NAME}
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+---
+# Template: KEDA HTTPScaledObject (scale-to-zero)
+# Requires: KEDA + KEDA HTTP Add-on installed on the cluster
+#
+# How it works:
+#   - The KEDA HTTP interceptor sits in front of the service
+#   - When requests arrive and replicas=0, KEDA scales up to 1
+#   - When no traffic for cooldownPeriod, KEDA scales back to 0
+#   - Cold start is ~3-5 seconds (container pull + Python startup)
+apiVersion: http.keda.sh/v1alpha1
+kind: HTTPScaledObject
+metadata:
+  name: pyrest-${APP_NAME}
+  namespace: pyrest
+  labels:
+    app: pyrest-${APP_NAME}
+    app.kubernetes.io/part-of: pyrest
+spec:
+  hosts:
+    - ""  # Match all hosts (use specific hostname if needed)
+  pathPrefixes:
+    - /pyrest/${APP_NAME}
+  scaleTargetRef:
+    name: pyrest-${APP_NAME}
+    service: pyrest-${APP_NAME}
+    port: 8001
+  replicas:
+    min: 0
+    max: 2
+  scalingMetric:
+    requestRate:
+      # Scale up when there are more than 10 requests per second per replica
+      targetValue: 10
+  # Scale to zero after 5 minutes of no traffic
+  cooldownPeriod: 300

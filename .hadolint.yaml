@@ -1,0 +1,26 @@
+# Hadolint configuration for Dockerfile linting
+# Aligned with SonarQube / SonaType IQ quality standards
+# See: https://github.com/hadolint/hadolint
+
+# Severity: error > warning > info > style
+# Only ignore rules with clear justification
+ignored:
+  # DL3059: Multiple consecutive RUN instructions
+  #   Deliberately split RUN for Docker layer caching (deps vs code)
+  - DL3059
+
+  # DL4006: Set SHELL option -o pipefail before RUN with pipe
+  #   Alpine uses /bin/sh which does not support pipefail
+  - DL4006
+
+# Trusted registries
+trustedRegistries:
+  - docker.io
+  - registry-1.docker.io
+
+# Override severity levels
+override:
+  error: []
+  warning: []
+  info: []
+  style: []

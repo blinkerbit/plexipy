@@ -8,16 +8,16 @@
 # =============================================================================
 # Single Stage: Alpine Python with Nginx
 # =============================================================================
-FROM python:3.11-alpine
+FROM python:3.14-alpine
 
 # Build arguments for internal PyPI proxy (air-gapped environments)
 ARG PIP_INDEX_URL=""
 ARG PIP_TRUSTED_HOST=""
 
-# Labels
-LABEL maintainer="PyRest Team"
-LABEL description="PyRest - Tornado-based REST API Framework with Nginx"
-LABEL version="1.0.0"
+# Labels (single instruction = single layer)
+LABEL maintainer="PyRest Team" \
+      description="PyRest - Tornado-based REST API Framework with Nginx" \
+      version="1.0.0"
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -28,64 +28,63 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_INDEX_URL=${PIP_INDEX_URL} \
     PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
-# Install system dependencies including nginx and build tools
+# Install runtime-only system dependencies and create non-root user
+# Build tools (gcc, musl-dev, etc.) are installed separately below and removed after use
 RUN apk add --no-cache \
-    nginx \
-    bash \
-    gcc \
-    musl-dev \
-    python3-dev \
-    libffi-dev \
-    openssl-dev \
+        nginx \
+        bash \
     && mkdir -p /run/nginx \
-    && rm -rf /var/cache/apk/*
-
-# Create non-root user
-RUN addgroup -g 1000 pyrest && \
-    adduser -u 1000 -G pyrest -s /bin/bash -D pyrest
+    && addgroup -g 1000 pyrest \
+    && adduser -u 1000 -G pyrest -s /bin/bash -D pyrest
 
 WORKDIR /app
 
-# Install uv for fast package management
-RUN pip install --no-cache-dir uv
+# Install build deps, Python packages (production only), then strip build deps
+# Uses .build-deps virtual package so apk del removes them cleanly (~150 MB saved)
+# Only production deps are installed -- pytest/ruff/dev tools stay out of the image
+COPY requirements.txt pyproject.toml ./
+# hadolint ignore=DL3013,DL3018
+RUN apk add --no-cache --virtual .build-deps \
+        gcc \
+        musl-dev \
+        python3-dev \
+        libffi-dev \
+        openssl-dev \
+    && pip install --no-cache-dir uv \
+    && uv pip install --system --no-cache \
+        'tornado>=6.4' 'pydantic>=2.0.0' 'PyJWT>=2.8.0' \
+    && apk del --no-network .build-deps
 
-# Copy and install Python dependencies
-COPY requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
-
-# Copy application code
-COPY --chown=pyrest:pyrest pyrest/ ./pyrest/
-COPY --chown=pyrest:pyrest apps/ ./apps/
-COPY --chown=pyrest:pyrest scripts/ ./scripts/
-COPY --chown=pyrest:pyrest main.py .
-COPY --chown=pyrest:pyrest config.json .
-COPY --chown=pyrest:pyrest auth_config.json .
-COPY --chown=pyrest:pyrest setup_pip.sh ./setup_pip.sh
+# Copy application code (executables get 755, config/data get 644)
+COPY --chown=pyrest:pyrest --chmod=755 pyrest/ ./pyrest/
+COPY --chown=pyrest:pyrest --chmod=755 apps/ ./apps/
+COPY --chown=pyrest:pyrest --chmod=755 scripts/ ./scripts/
+COPY --chown=pyrest:pyrest --chmod=755 main.py .
+COPY --chown=pyrest:pyrest --chmod=755 setup_pip.sh .
+COPY --chown=pyrest:pyrest --chmod=644 config.json auth_config.json pyproject.toml ./
 
 # Copy nginx configuration
-COPY --chown=pyrest:pyrest nginx/docker-nginx.conf /etc/nginx/nginx.conf
+COPY --chown=pyrest:pyrest --chmod=644 nginx/docker-nginx.conf /etc/nginx/nginx.conf
 
-# Create directories for nginx config, logs, and PID
-# Set proper permissions for nginx to run
-RUN mkdir -p /app/nginx /app/logs /var/log/nginx /run/nginx /etc/nginx/conf.d && \
-    sed -i 's/\r$//' /app/setup_pip.sh /app/scripts/*.sh && \
-    chmod +x /app/setup_pip.sh && \
-    chmod +x /app/scripts/*.sh && \
-    chown -R pyrest:pyrest /app && \
-    chown -R pyrest:pyrest /var/log/nginx && \
-    chown -R pyrest:pyrest /run/nginx && \
-    chown -R pyrest:pyrest /var/lib/nginx && \
-    chown -R pyrest:pyrest /etc/nginx && \
-    touch /run/nginx/nginx.pid && \
-    chown pyrest:pyrest /run/nginx/nginx.pid
+# Create directories, fix Windows line endings, set permissions -- single layer
+# No redundant chmod/chown since COPY --chown/--chmod already handled app files
+RUN mkdir -p /app/nginx /app/logs /var/log/nginx /etc/nginx/conf.d \
+    && sed -i 's/\r$//' /app/setup_pip.sh /app/scripts/*.sh \
+    && chown -R pyrest:pyrest /app/nginx /app/logs \
+    && chown -R pyrest:pyrest /var/log/nginx /run/nginx /var/lib/nginx /etc/nginx \
+    && touch /run/nginx/nginx.pid \
+    && chown pyrest:pyrest /run/nginx/nginx.pid
 
-# Expose ports (nginx on 80/443, pyrest on 8000)
-EXPOSE 80 443 8000
+# Switch to non-root user before all runtime instructions
+USER pyrest
 
-# Health check - check nginx and pyrest
+# Expose ports (nginx on 8080/8443, pyrest on 8000)
+EXPOSE 8080 8443 8000
+
+# Health check - verify both nginx and pyrest are responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget -q --spider http://localhost/nginx-health && \
-    wget -q --spider http://localhost:8000/pyrest/health || exit 1
+    CMD wget -q --spider http://localhost:8080/nginx-health && \
+        wget -q --spider http://localhost:8000/pyrest/health || exit 1
 
 # Use custom entrypoint that starts both nginx and pyrest
 CMD ["/app/scripts/entrypoint-unified.sh"]

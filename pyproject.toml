@@ -1,0 +1,224 @@
+# =============================================================================
+# PyRest Framework - Project Configuration
+# =============================================================================
+
+[project]
+name = "pyrest"
+version = "1.0.0"
+description = "Tornado-based REST API framework for TM1 developers"
+requires-python = ">=3.12"
+dependencies = [
+    "tornado>=6.4",
+    "pydantic>=2.0.0",
+    "PyJWT>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+]
+tm1 = [
+    "TM1py>=2.0.0",
+    "httpx>=0.27.0",
+]
+dataframe = [
+    "polars>=1.0.0",
+]
+
+# =============================================================================
+# Pytest Configuration
+# =============================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# =============================================================================
+# Ruff Linter Configuration
+# =============================================================================
+
+[tool.ruff]
+# Ruff configuration for PyRest -- SonarQube-aligned quality gates
+line-length = 100
+target-version = "py314"
+# Exclude patterns
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "*.egg-info",
+    "build",
+    "dist",
+    "node_modules",
+]
+
+[tool.ruff.lint]
+# Rule sets aligned with SonarQube / SonaType IQ quality standards
+select = [
+    # Core Python quality
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names)
+    "I",    # isort (import ordering)
+
+    # Bug prevention
+    "B",    # flake8-bugbear (common pitfalls)
+    "C4",   # flake8-comprehensions (better comprehensions)
+    "UP",   # pyupgrade (modern Python syntax)
+    "SIM",  # flake8-simplify (simplifiable code)
+
+    # Security (SonarQube S-rules equivalent)
+    "S",    # flake8-bandit (security checks: hardcoded passwords, eval, exec, etc.)
+
+    # Exception handling quality
+    "TRY",  # tryceratops (exception anti-patterns: broad except, reraise, etc.)
+    "EM",   # flake8-errmsg (string literals in exceptions)
+
+    # Performance
+    "PERF", # perflint (performance anti-patterns)
+
+    # Ruff-native quality rules
+    "RUF",  # Ruff-specific rules (mutable defaults, ambiguous unicode, etc.)
+
+    # Type annotation quality
+    "ANN",  # flake8-annotations (enforce type annotations)
+
+    # Unused code
+    "ARG",  # flake8-unused-arguments
+    "F841", # unused variables
+
+    # Logging best practices
+    "LOG",  # flake8-logging (logging anti-patterns)
+    "G",    # flake8-logging-format (use %-style in logging)
+    "T20",  # flake8-print (no print statements)
+
+    # Code complexity
+    "C90",  # mccabe (cyclomatic complexity)
+    "PLR",  # pylint refactor (too many args, too many branches, etc.)
+
+    # Return statement quality
+    "RET",  # flake8-return (unnecessary return, implicit return)
+
+    # Pathlib preference
+    "PTH",  # flake8-use-pathlib
+]
+
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "B008",    # function calls in argument defaults (common in Pydantic)
+    "ARG001",  # unused function argument (common in handlers/decorators)
+    "ARG002",  # unused method argument (common in handlers)
+    "ANN401",  # typing.Any disallowed (too strict for framework code)
+    "ANN002",  # missing type annotation for *args
+    "ANN003",  # missing type annotation for **kwargs
+    "ANN204",  # missing return type for __init__
+    "TRY003",  # long exception messages (too strict)
+    "EM101",   # string literal in exception (too strict)
+    "EM102",   # f-string in exception (too strict)
+    "RET504",  # unnecessary variable before return (aids readability)
+    "PLR0913", # too many arguments (some functions legitimately need them)
+    "PLR2004", # magic value in comparison (too many false positives)
+    "S101",    # use of assert (fine in tests and preconditions)
+    "G004",    # logging f-string (we prefer f-strings for readability)
+    "RUF012",  # mutable class variable annotation (too strict for dataclasses)
+    "RET505",  # unnecessary else after return
+    "SIM108",  # ternary instead of if-else (readability preference)
+    "S104",    # hardcoded bind-all-interfaces (intentional in Docker: 0.0.0.0)
+    "S603",    # subprocess without shell=True (we never use shell=True, this is noise)
+    "S607",    # start process with partial path (we use uv/python, trusted binaries)
+    "S608",    # hardcoded SQL expression (false positive: MDX queries, not SQL)
+    "TRY300",  # try-consider-else (too noisy for our error-handling patterns)
+    "TRY401",  # verbose-log-message (we intentionally log exception details)
+    "TRY301",  # raise-within-try (valid pattern for re-raising with context)
+    "PLR0911", # too-many-return-statements (some methods need early returns)
+    "PLR0915", # too-many-statements (config/setup methods are inherently large)
+    "PLR0912", # too-many-branches (config parsing is inherently branchy)
+]
+
+[tool.ruff.lint.mccabe]
+# SonarQube default cognitive complexity is 15
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-branches = 12
+max-returns = 6
+max-statements = 50
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: relax strict rules
+"tests/**/*.py" = [
+    "ARG001", "ARG002",
+    "S101", "S105",  # assert and hardcoded test passwords are fine
+    "ANN",
+    "PLR",
+    "T20",
+    "PTH123",        # open() acceptable in test helpers
+    "SIM112", "SIM117",
+    "ARG005",
+]
+# Handlers: relax unused-arg and annotation rules
+"**/handlers.py" = [
+    "ARG001", "ARG002",
+    "ANN001", "ANN201",
+]
+# Decorators: dynamic wrapper functions have inherently dynamic types
+"**/decorators.py" = [
+    "ANN001", "ANN201", "ANN202",
+]
+# Auth: decorator factories and dynamic wrappers
+"**/auth.py" = [
+    "ANN001", "ANN201", "ANN202",
+]
+# Validation: dynamic model creation
+"**/validation.py" = [
+    "ANN001", "ANN201", "ANN202",
+]
+# Simple handler: dynamic handler factory
+"**/simple_handler.py" = [
+    "ANN001", "ANN201", "ANN202",
+]
+# Templates: relaxed rules for generated/template code
+"**/templates/*.py" = [
+    "ANN", "PLR", "C90",
+]
+# Config modules: complex parsing is inherent
+"**/config.py" = [
+    "C90", "PLR0912",
+]
+# TM1 utils: complex connection building is inherent
+"**/utils/tm1.py" = [
+    "C90", "PLR0912",
+]
+# App handlers in apps/: user-written code, relax strict rules
+"apps/**/*.py" = [
+    "ANN", "PTH", "SIM112", "S105",
+    "PERF401", "SIM117", "ARG005", "C901",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyrest"]
+force-single-line = false
+force-wrap-aliases = false

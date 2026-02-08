@@ -1,0 +1,76 @@
+# PyRest Framework - Air-Gapped Environment Configuration
+# Single Container with Python + Nginx (Alpine-based)
+#
+# Use this file for environments without direct internet access.
+# Requires an internal PyPI proxy server.
+#
+# Usage:
+#   docker-compose -f docker-compose.airgapped.yml build
+#   docker-compose -f docker-compose.airgapped.yml up -d
+#
+# Prerequisites:
+#   1. Internal PyPI proxy (e.g., Nexus, Artifactory, devpi)
+#   2. Required packages mirrored: tornado, pyjwt, TM1py, etc.
+
+version: '3.8'
+
+# Define your internal PyPI proxy URL here
+# (uv automatically uses PIP_INDEX_URL - no separate config needed)
+x-pypi-proxy: &pypi-proxy
+  PIP_INDEX_URL: https://pypi.internal.company.com/simple/
+  PIP_TRUSTED_HOST: pypi.internal.company.com
+
+services:
+  # =========================================================================
+  # Main PyRest Server with Embedded Nginx
+  # Single Alpine container running both Python app and Nginx
+  # =========================================================================
+  pyrest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time PyPI proxy for installing main dependencies
+        PIP_INDEX_URL: https://pypi.internal.company.com/simple/
+        PIP_TRUSTED_HOST: pypi.internal.company.com
+    container_name: pyrest-main
+    restart: unless-stopped
+    ports:
+      # Nginx (reverse proxy)
+      - "80:80"
+      - "443:443"
+      # PyRest API (direct access - optional)
+      - "8000:8000"
+    environment:
+      - PYREST_HOST=0.0.0.0
+      - PYREST_PORT=8000
+      - PYREST_DEBUG=false
+      # Runtime PyPI proxy for isolated app dependency installation
+      # (uv automatically uses PIP_INDEX_URL - no separate config needed)
+      - PIP_INDEX_URL=https://pypi.internal.company.com/simple/
+      - PIP_TRUSTED_HOST=pypi.internal.company.com
+    volumes:
+      - ./apps:/app/apps
+      - ./config.json:/app/config.json:ro
+      - ./auth_config.json:/app/auth_config.json:ro
+      - ./nginx:/app/nginx
+      # SSL certificates (uncomment for HTTPS)
+      # - ./nginx/ssl:/etc/nginx/ssl:ro
+      - pyrest-logs:/app/logs
+    networks:
+      - pyrest-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/nginx-health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  pyrest-network:
+    driver: bridge
+    name: pyrest-network
+
+volumes:
+  pyrest-logs:
+    name: pyrest-logs

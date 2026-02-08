@@ -1,0 +1,9 @@
+# PyRest Namespace
+# Creates an isolated namespace for all PyRest workloads
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pyrest
+  labels:
+    app.kubernetes.io/part-of: pyrest
+    app.kubernetes.io/managed-by: pyrest-team

@@ -42,7 +42,7 @@ cleanup() {
     echo ""
     echo "Shutting down..."
     # Stop nginx
-    if [ -f /run/nginx/nginx.pid ]; then
+    if [[ -f /run/nginx/nginx.pid ]]; then
         nginx -s quit 2>/dev/null || true
     fi
     # Kill background processes
@@ -66,11 +66,11 @@ start_isolated_app() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
     # Create venv if needed
-    if [ ! -f "$python_exe" ]; then
+    if [[ ! -f "$python_exe" ]]; then
         echo "Creating venv at: $venv_path"
         
         # Remove existing invalid venv
-        [ -d "$venv_path" ] && rm -rf "$venv_path"
+        [[ -d "$venv_path" ]] && rm -rf "$venv_path"
         
         # Create venv using uv if available
         if command -v uv &> /dev/null; then
@@ -79,8 +79,8 @@ start_isolated_app() {
             python3 -m venv "$venv_path"
         fi
         
-        if [ ! -f "$python_exe" ]; then
-            echo "ERROR: Failed to create venv for $app_name"
+        if [[ ! -f "$python_exe" ]]; then
+            echo "ERROR: Failed to create venv for $app_name" >&2
             return 1
         fi
     fi
@@ -89,7 +89,7 @@ start_isolated_app() {
     # Both pip and uv respect PIP_INDEX_URL and PIP_TRUSTED_HOST env vars
     echo "Installing requirements..."
     
-    if [ -n "$PIP_INDEX_URL" ]; then
+    if [[ -n "$PIP_INDEX_URL" ]]; then
         echo "  Using PyPI index: $PIP_INDEX_URL"
     fi
     
@@ -116,6 +116,7 @@ start_isolated_app() {
     local app_pid=$!
     echo "✓ $app_name started (PID: $app_pid) on port $port"
     echo "  Log: /app/logs/${app_name}.log"
+    return 0
 }
 
 # =============================================================================
@@ -129,7 +130,7 @@ echo "============================================================"
 mkdir -p /etc/nginx/conf.d
 
 # Copy generated nginx config if it exists
-if [ -f "/app/nginx/pyrest_generated.conf" ]; then
+if [[ -f "/app/nginx/pyrest_generated.conf" ]]; then
     # Copy and fix upstream addresses for unified container mode
     # Replace 'server pyrest:' with 'server 127.0.0.1:' since nginx and pyrest are on same host
     sed 's/server pyrest:/server 127.0.0.1:/g' /app/nginx/pyrest_generated.conf > /etc/nginx/conf.d/pyrest.conf
@@ -145,8 +146,8 @@ upstream pyrest_main {
 }
 
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen 8080 default_server;
+    listen [::]:8080 default_server;
     server_name _;
 
     location /nginx-health {
@@ -182,7 +183,7 @@ sleep 1
 
 # Verify nginx is running
 if ! kill -0 $NGINX_PID 2>/dev/null; then
-    echo "ERROR: Nginx failed to start!"
+    echo "ERROR: Nginx failed to start!" >&2
     cat /var/log/nginx/error.log 2>/dev/null || true
     exit 1
 fi
@@ -198,15 +199,15 @@ echo "============================================================"
 current_port=$BASE_PORT
 isolated_count=0
 
-if [ -d "$APPS_FOLDER" ]; then
+if [[ -d "$APPS_FOLDER" ]]; then
     # Sort apps alphabetically to ensure consistent port assignment with Python
     for app_dir in $(find "$APPS_FOLDER" -mindepth 1 -maxdepth 1 -type d | sort); do
-        [ -d "$app_dir" ] || continue
+        [[ -d "$app_dir" ]] || continue
         
         requirements_file="$app_dir/requirements.txt"
         
         # Only process apps with requirements.txt (isolated apps)
-        if [ -f "$requirements_file" ]; then
+        if [[ -f "$requirements_file" ]]; then
             start_isolated_app "$app_dir" "$current_port"
             current_port=$((current_port + 1))
             isolated_count=$((isolated_count + 1))
@@ -214,7 +215,7 @@ if [ -d "$APPS_FOLDER" ]; then
     done
 fi
 
-if [ $isolated_count -eq 0 ]; then
+if [[ $isolated_count -eq 0 ]]; then
     echo "No isolated apps found"
 else
     echo ""
@@ -250,7 +251,7 @@ echo ""
 echo "Waiting for PyRest to generate nginx configuration..."
 sleep 5
 
-if [ -f "/app/nginx/pyrest_generated.conf" ]; then
+if [[ -f "/app/nginx/pyrest_generated.conf" ]]; then
     echo "Reloading nginx with updated configuration..."
     # Copy and fix upstream addresses for unified container mode
     sed 's/server pyrest:/server 127.0.0.1:/g' /app/nginx/pyrest_generated.conf > /etc/nginx/conf.d/pyrest.conf
@@ -263,7 +264,7 @@ echo "============================================================"
 echo "All services started successfully!"
 echo "============================================================"
 echo ""
-echo "  Nginx:     http://localhost:80"
+echo "  Nginx:     http://localhost:8080"
 echo "  PyRest:    http://localhost:8000"
 echo ""
 

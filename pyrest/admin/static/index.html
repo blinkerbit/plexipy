@@ -15,6 +15,7 @@
             --success: #859900;
             --warning: #b58900;
             --error: #dc322f;
+            --cyan: #2aa198;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -25,7 +26,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 1100px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 2rem 1.5rem;
         }
@@ -142,6 +143,7 @@
             padding: 0.75rem 1rem;
             border-bottom: 1px solid var(--bg-alt);
             transition: background 0.15s ease;
+            vertical-align: top;
         }
         tr:hover td { background: var(--bg-alt); }
         .badge {
@@ -149,6 +151,7 @@
             padding: 0.2rem 0.5rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            display: inline-block;
         }
         .badge.loaded { color: var(--success); border: 1px solid var(--success); }
         .badge.running { color: var(--success); border: 1px solid var(--success); }
@@ -156,16 +159,34 @@
         .badge.failed { color: var(--error); border: 1px solid var(--error); }
         .badge.embedded { color: var(--fg-dim); border: 1px solid var(--fg-dim); }
         .badge.isolated { color: var(--accent); border: 1px solid var(--accent); }
+        .badge.healthy { color: var(--success); border: 1px solid var(--success); }
+        .badge.unhealthy { color: var(--error); border: 1px solid var(--error); }
+        .badge.checking { color: var(--fg-dim); border: 1px solid var(--fg-dim); }
+        .health-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.4rem;
+            vertical-align: middle;
+        }
+        .health-dot.green { background: var(--success); }
+        .health-dot.red { background: var(--error); }
+        .health-dot.gray { background: var(--fg-dim); }
+        .health-dot.pulse { animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         .actions {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.4rem;
+            flex-wrap: wrap;
         }
         .action-btn {
             background: none;
             border: 1px solid var(--fg-dim);
             color: var(--fg-dim);
-            padding: 0.25rem 0.5rem;
-            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.65rem;
+            font-family: inherit;
             cursor: pointer;
             transition: all 0.15s ease;
         }
@@ -173,9 +194,62 @@
             border-color: var(--fg);
             color: var(--fg);
         }
+        .action-btn.success:hover {
+            border-color: var(--success);
+            color: var(--success);
+        }
         .action-btn.danger:hover {
             border-color: var(--error);
             color: var(--error);
+        }
+        .action-btn.warn:hover {
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+        .action-btn.primary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .action-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        /* Process tree & venv info */
+        .proc-info {
+            font-size: 0.7rem;
+            margin-top: 0.3rem;
+            color: var(--fg-dim);
+        }
+        .proc-info .pid { color: var(--cyan); }
+        .proc-info .workers { color: var(--fg); }
+        .venv-info {
+            font-size: 0.7rem;
+            color: var(--fg-dim);
+        }
+        .venv-info .venv-exists { color: var(--success); }
+        .venv-info .venv-missing { color: var(--warning); }
+        .venv-info .venv-invalid { color: var(--error); }
+        /* Detail row (expandable) */
+        .detail-row td {
+            padding: 0.5rem 1rem;
+            background: rgba(7, 54, 66, 0.8);
+            border-bottom: 2px solid var(--bg-alt);
+        }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+        .detail-item-label {
+            color: var(--fg-dim);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .detail-item-value {
+            color: var(--fg-bright);
+            word-break: break-all;
         }
         .log-container {
             background: var(--bg-alt);
@@ -239,6 +313,8 @@
             transform: translateY(1rem);
             transition: all 0.3s ease;
             pointer-events: none;
+            z-index: 1000;
+            max-width: 400px;
         }
         .toast.show {
             opacity: 1;
@@ -246,13 +322,44 @@
         }
         .toast.success { border-color: var(--success); }
         .toast.error { border-color: var(--error); }
-        
-        /* Fade in */
         .fade-in {
             animation: fadeIn 0.3s ease-out forwards;
             opacity: 0;
         }
         @keyframes fadeIn { to { opacity: 1; } }
+        /* Confirm dialog */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-box {
+            background: var(--bg-alt);
+            border: 1px solid var(--fg-dim);
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-box h3 {
+            color: var(--fg-bright);
+            font-size: 1rem;
+            font-weight: normal;
+            margin-bottom: 1rem;
+        }
+        .modal-box p {
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
     </style>
 </head>
 <body>
@@ -267,6 +374,10 @@
 
         <div class="status-bar fade-in" id="status-bar">
             <div class="stat">
+                <div class="stat-value" id="framework-health">-</div>
+                <div class="stat-label">Framework</div>
+            </div>
+            <div class="stat">
                 <div class="stat-value" id="total-apps">-</div>
                 <div class="stat-label">Total Apps</div>
             </div>
@@ -277,6 +388,10 @@
             <div class="stat">
                 <div class="stat-value" id="isolated-count">-</div>
                 <div class="stat-label">Isolated</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="healthy-count">-</div>
+                <div class="stat-label">Healthy</div>
             </div>
             <div class="stat">
                 <div class="stat-value" id="failed-count">-</div>
@@ -296,13 +411,14 @@
                     <tr>
                         <th>Name</th>
                         <th>Type</th>
-                        <th>Prefix</th>
-                        <th>Status</th>
+                        <th>Status / Processes</th>
+                        <th>Venv</th>
+                        <th>Health</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="apps-tbody">
-                    <tr><td colspan="5" class="empty"><span class="spinner"></span> Loading...</td></tr>
+                    <tr><td colspan="6" class="empty"><span class="spinner"></span> Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -324,11 +440,27 @@
 
     <div class="toast" id="toast"></div>
 
+    <!-- Confirm dialog -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-box">
+            <h3 id="confirm-title">Confirm</h3>
+            <p id="confirm-message">Are you sure?</p>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeConfirm()">Cancel</button>
+                <button class="btn primary" id="confirm-btn" onclick="doConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         var API_BASE = '/pyrest/admin/api';
         var logs = [];
+        var healthCache = {};
+        var pendingConfirmAction = null;
 
+        // =====================================================================
         // Tab switching
+        // =====================================================================
         document.querySelectorAll('.tab').forEach(function(tab) {
             tab.addEventListener('click', function() {
                 document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -338,17 +470,20 @@
             });
         });
 
+        // =====================================================================
+        // Toast & Logging
+        // =====================================================================
         function showToast(message, type) {
             var toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast ' + (type || '') + ' show';
-            setTimeout(function() { toast.classList.remove('show'); }, 3000);
+            setTimeout(function() { toast.classList.remove('show'); }, 4000);
         }
 
         function addLog(level, message) {
             var now = new Date().toLocaleTimeString();
             logs.unshift({ time: now, level: level, message: message });
-            if (logs.length > 50) logs.pop();
+            if (logs.length > 100) logs.pop();
             renderLogs();
         }
 
@@ -367,7 +502,77 @@
             }).join('');
         }
 
+        // =====================================================================
+        // Confirm dialog
+        // =====================================================================
+        function showConfirm(title, message, action) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            pendingConfirmAction = action;
+            document.getElementById('confirm-modal').classList.add('show');
+        }
+
+        function closeConfirm() {
+            document.getElementById('confirm-modal').classList.remove('show');
+            pendingConfirmAction = null;
+        }
+
+        function doConfirm() {
+            var action = pendingConfirmAction;
+            closeConfirm();
+            if (action) action();
+        }
+
+        // =====================================================================
+        // Health Check
+        // =====================================================================
+        function checkHealth(url, timeout) {
+            timeout = timeout || 3000;
+            return new Promise(function(resolve) {
+                var controller = new AbortController();
+                var timer = setTimeout(function() {
+                    controller.abort();
+                    resolve({ healthy: false, error: 'timeout', latency: timeout });
+                }, timeout);
+
+                var start = Date.now();
+                fetch(url, { signal: controller.signal })
+                    .then(function(r) {
+                        clearTimeout(timer);
+                        var latency = Date.now() - start;
+                        if (r.ok) {
+                            return r.json().then(function(data) {
+                                resolve({ healthy: true, latency: latency, data: data });
+                            }).catch(function() {
+                                resolve({ healthy: true, latency: latency, data: {} });
+                            });
+                        } else {
+                            resolve({ healthy: false, error: 'HTTP ' + r.status, latency: latency });
+                        }
+                    })
+                    .catch(function(e) {
+                        clearTimeout(timer);
+                        var latency = Date.now() - start;
+                        resolve({ healthy: false, error: e.message, latency: latency });
+                    });
+            });
+        }
+
+        function healthBadge(result) {
+            if (!result) {
+                return '<span class="health-dot gray pulse"></span><span class="badge checking">...</span>';
+            }
+            if (result.healthy) {
+                return '<span class="health-dot green"></span><span class="badge healthy">' + result.latency + 'ms</span>';
+            }
+            return '<span class="health-dot red"></span><span class="badge unhealthy" title="' + (result.error || 'unreachable') + '">down</span>';
+        }
+
+        // =====================================================================
+        // Data Loading
+        // =====================================================================
         function refreshData() {
+            healthCache = {};
             loadStatus();
             loadConfig();
             addLog('info', 'Data refreshed');
@@ -375,6 +580,17 @@
         }
 
         function loadStatus() {
+            // Check framework health
+            checkHealth('/pyrest/health').then(function(result) {
+                var el = document.getElementById('framework-health');
+                if (result.healthy) {
+                    el.innerHTML = '<span style="color: var(--success);">OK</span>';
+                } else {
+                    el.innerHTML = '<span style="color: var(--error);">DOWN</span>';
+                }
+            });
+
+            // Load app status from admin API
             fetch(API_BASE + '/status')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
@@ -385,6 +601,60 @@
                 });
         }
 
+        // =====================================================================
+        // Render helpers
+        // =====================================================================
+        function renderProcessInfo(proc) {
+            if (!proc || !proc.running) {
+                return '<span class="proc-info">not running</span>';
+            }
+            var html = '<div class="proc-info">';
+            html += 'PID <span class="pid">' + proc.pid + '</span>';
+            var total = proc.total_processes || 1;
+            var children = proc.child_pids || [];
+            if (children.length > 0) {
+                html += ' + <span class="workers">' + children.length + ' workers</span>';
+                html += '<br><span style="color:var(--fg-dim);font-size:0.6rem;">' + children.join(', ') + '</span>';
+            }
+            html += ' <span style="color:var(--fg-dim);">(' + total + ' total)</span>';
+            html += '</div>';
+            return html;
+        }
+
+        function renderVenvInfo(venv) {
+            if (!venv) return '<span class="venv-info venv-missing">-</span>';
+            var html = '<div class="venv-info">';
+            if (!venv.exists) {
+                html += '<span class="venv-missing">no .venv</span>';
+            } else if (!venv.valid) {
+                html += '<span class="venv-invalid">invalid</span>';
+            } else {
+                html += '<span class="venv-exists">ready</span>';
+                if (venv.size_mb !== null && venv.size_mb !== undefined) {
+                    html += ' <span style="color:var(--fg-dim);">(' + venv.size_mb + ' MB)</span>';
+                }
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function renderIsolatedActions(name, isRunning) {
+            var html = '<div class="actions">';
+            if (isRunning) {
+                html += '<button class="action-btn danger" onclick="controlApp(\'' + name + '\', \'stop\')">Stop</button>';
+                html += '<button class="action-btn" onclick="controlApp(\'' + name + '\', \'restart\')">Restart</button>';
+            } else {
+                html += '<button class="action-btn success" onclick="controlApp(\'' + name + '\', \'start\')">Start</button>';
+            }
+            html += '<button class="action-btn warn" onclick="confirmClearVenv(\'' + name + '\')">Clear Venv</button>';
+            html += '<button class="action-btn primary" onclick="confirmRebuild(\'' + name + '\')">Rebuild</button>';
+            html += '</div>';
+            return html;
+        }
+
+        // =====================================================================
+        // Render status
+        // =====================================================================
         function renderStatus(data) {
             var embedded = data.apps.embedded || [];
             var isolated = data.apps.isolated || [];
@@ -394,51 +664,106 @@
             document.getElementById('embedded-count').textContent = embedded.length;
             document.getElementById('isolated-count').textContent = isolated.length;
             document.getElementById('failed-count').textContent = failed.length;
+            document.getElementById('healthy-count').innerHTML = '<span class="spinner" style="width:12px;height:12px;"></span>';
 
             var tbody = document.getElementById('apps-tbody');
             var rows = [];
+            var allApps = [];
 
+            // Embedded apps
             embedded.forEach(function(app) {
+                var healthId = 'health-' + app.name;
+                allApps.push({ name: app.name, prefix: app.prefix, type: 'embedded' });
+
                 rows.push('<tr>' +
-                    '<td>' + app.name + '</td>' +
+                    '<td><strong>' + app.name + '</strong><br><span style="color:var(--fg-dim);font-size:0.7rem;">' + app.prefix + '</span></td>' +
                     '<td><span class="badge embedded">embedded</span></td>' +
-                    '<td>' + app.prefix + '</td>' +
                     '<td><span class="badge loaded">loaded</span></td>' +
+                    '<td>-</td>' +
+                    '<td id="' + healthId + '">' + healthBadge(null) + '</td>' +
                     '<td>-</td>' +
                     '</tr>');
             });
 
+            // Isolated apps
             isolated.forEach(function(app) {
-                var status = app.running ? 'running' : 'stopped';
+                var isRunning = false;
+                var proc = app.process || null;
+                if (proc && proc.running) {
+                    isRunning = true;
+                } else if (app.running === true) {
+                    isRunning = true;
+                }
+
+                var statusBadge = isRunning ?
+                    '<span class="badge running">running</span>' :
+                    '<span class="badge stopped">stopped</span>';
+
+                var healthId = 'health-' + app.name;
+                allApps.push({ name: app.name, prefix: app.prefix, type: 'isolated', port: app.port });
+
                 rows.push('<tr>' +
-                    '<td>' + app.name + '</td>' +
+                    '<td><strong>' + app.name + '</strong>' +
+                        '<br><span style="color:var(--fg-dim);font-size:0.7rem;">' + app.prefix + ' :' + app.port + '</span></td>' +
                     '<td><span class="badge isolated">isolated</span></td>' +
-                    '<td>' + app.prefix + ' (port ' + app.port + ')</td>' +
-                    '<td><span class="badge ' + status + '">' + status + '</span></td>' +
-                    '<td class="actions">' +
-                        '<button class="action-btn" onclick="controlApp(\'' + app.name + '\', \'restart\')">Restart</button>' +
-                        '<button class="action-btn danger" onclick="controlApp(\'' + app.name + '\', \'stop\')">Stop</button>' +
-                    '</td>' +
+                    '<td>' + statusBadge + renderProcessInfo(proc) + '</td>' +
+                    '<td>' + renderVenvInfo(app.venv) + '</td>' +
+                    '<td id="' + healthId + '">' + healthBadge(null) + '</td>' +
+                    '<td>' + renderIsolatedActions(app.name, isRunning) + '</td>' +
                     '</tr>');
             });
 
+            // Failed apps
             failed.forEach(function(app) {
+                var errShort = (app.error || 'Error').substring(0, 60);
                 rows.push('<tr>' +
-                    '<td>' + app.name + '</td>' +
+                    '<td><strong>' + app.name + '</strong></td>' +
                     '<td><span class="badge ' + (app.isolated ? 'isolated' : 'embedded') + '">' + (app.isolated ? 'isolated' : 'embedded') + '</span></td>' +
-                    '<td>' + (app.path || '-') + '</td>' +
-                    '<td><span class="badge failed">failed</span></td>' +
-                    '<td title="' + app.error + '">Error</td>' +
+                    '<td><span class="badge failed">failed</span><div class="proc-info" title="' + (app.error || '') + '">' + errShort + '</div></td>' +
+                    '<td>-</td>' +
+                    '<td><span class="health-dot red"></span><span class="badge unhealthy">error</span></td>' +
+                    '<td>-</td>' +
                     '</tr>');
             });
 
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty">No applications</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty">No applications</td></tr>';
             } else {
                 tbody.innerHTML = rows.join('');
             }
+
+            // Ping each app's health endpoint
+            var healthyCount = 0;
+            var checkedCount = 0;
+            var totalToCheck = allApps.length;
+
+            allApps.forEach(function(app) {
+                checkHealth(app.prefix + '/health').then(function(result) {
+                    healthCache[app.name] = result;
+                    checkedCount++;
+
+                    var cell = document.getElementById('health-' + app.name);
+                    if (cell) cell.innerHTML = healthBadge(result);
+
+                    if (result.healthy) healthyCount++;
+
+                    if (checkedCount >= totalToCheck) {
+                        var countEl = document.getElementById('healthy-count');
+                        countEl.textContent = healthyCount + '/' + totalToCheck;
+                        countEl.style.color = healthyCount === totalToCheck ? 'var(--success)' :
+                            (healthyCount > 0 ? 'var(--warning)' : 'var(--error)');
+                    }
+                });
+            });
+
+            if (totalToCheck === 0) {
+                document.getElementById('healthy-count').textContent = '0';
+            }
         }
 
+        // =====================================================================
+        // Config
+        // =====================================================================
         function loadConfig() {
             fetch(API_BASE + '/config')
                 .then(function(r) { return r.json(); })
@@ -466,19 +791,39 @@
             grid.innerHTML = items.join('') || '<div class="empty">No configuration data</div>';
         }
 
+        // =====================================================================
+        // App control
+        // =====================================================================
         function controlApp(name, action) {
-            addLog('info', 'Sending ' + action + ' command to ' + name);
+            addLog('info', 'Sending ' + action + ' to ' + name + '...');
+            showToast(action + ' ' + name + '...', '');
+
             fetch(API_BASE + '/apps/' + name + '/' + action, { method: 'POST' })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
-                        showToast('App ' + action + ' successful', 'success');
-                        addLog('info', name + ' ' + action + ' successful');
+                        var msg = data.message || (action + ' successful');
+                        showToast(msg, 'success');
+                        addLog('info', name + ': ' + msg);
+
+                        // Log extra details
+                        if (data.data) {
+                            if (data.data.killed_pids) {
+                                addLog('info', name + ': killed PIDs: ' + data.data.killed_pids.join(', '));
+                            }
+                            if (data.data.steps) {
+                                addLog('info', name + ': steps: ' + data.data.steps.join(' -> '));
+                            }
+                            if (data.data.pid) {
+                                addLog('info', name + ': new PID: ' + data.data.pid);
+                            }
+                        }
                     } else {
-                        showToast('Error: ' + data.error, 'error');
-                        addLog('error', name + ' ' + action + ' failed: ' + data.error);
+                        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+                        addLog('error', name + ' ' + action + ' failed: ' + (data.error || 'Unknown'));
                     }
-                    loadStatus();
+                    // Reload status after delay
+                    setTimeout(loadStatus, 2000);
                 })
                 .catch(function(e) {
                     showToast('Error: ' + e.message, 'error');
@@ -486,11 +831,32 @@
                 });
         }
 
+        function confirmClearVenv(name) {
+            showConfirm(
+                'Clear Virtual Environment',
+                'This will stop "' + name + '" (if running) and delete its .venv directory. You will need to rebuild before starting again.',
+                function() { controlApp(name, 'clear-venv'); }
+            );
+        }
+
+        function confirmRebuild(name) {
+            showConfirm(
+                'Rebuild Virtual Environment',
+                'This will stop "' + name + '", delete .venv, create a fresh one, install dependencies, and restart the app. This may take a minute.',
+                function() { controlApp(name, 'rebuild-venv'); }
+            );
+        }
+
+        // =====================================================================
         // Initial load
+        // =====================================================================
         document.addEventListener('DOMContentLoaded', function() {
             addLog('info', 'Admin dashboard loaded');
             loadStatus();
             loadConfig();
+
+            // Auto-refresh every 30 seconds
+            setInterval(loadStatus, 30000);
         });
     </script>
 </body>

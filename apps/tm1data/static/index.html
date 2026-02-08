@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +18,13 @@
             --error: #dc322f;
             --cyan: #2aa198;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: var(--bg);
@@ -25,11 +32,13 @@
             line-height: 1.6;
             min-height: 100vh;
         }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem 1.5rem;
         }
+
         header {
             display: flex;
             justify-content: space-between;
@@ -38,13 +47,18 @@
             padding-bottom: 1.5rem;
             margin-bottom: 2rem;
         }
+
         h1 {
             font-size: 1.5rem;
             font-weight: normal;
             color: var(--fg-bright);
             letter-spacing: 0.05em;
         }
-        h1 span { color: var(--fg-dim); }
+
+        h1 span {
+            color: var(--fg-dim);
+        }
+
         h2 {
             font-size: 0.85rem;
             font-weight: normal;
@@ -53,6 +67,7 @@
             color: var(--fg-dim);
             margin-bottom: 1rem;
         }
+
         .btn {
             background: var(--bg-alt);
             color: var(--fg);
@@ -63,59 +78,75 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
+
         .btn:hover {
             background: #0a4052;
             color: var(--fg-bright);
             border-color: var(--fg);
         }
+
         .btn.primary {
             border-color: var(--accent);
             color: var(--accent);
         }
+
         .btn.primary:hover {
             background: var(--accent);
             color: var(--bg);
         }
+
         .btn.success {
             border-color: var(--success);
             color: var(--success);
         }
+
         .btn.success:hover {
             background: var(--success);
             color: var(--bg);
         }
+
         .btn.danger {
             border-color: var(--error);
             color: var(--error);
         }
+
         .btn.danger:hover {
             background: var(--error);
             color: var(--bg);
         }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         .btn-sm {
             padding: 0.3rem 0.6rem;
             font-size: 0.75rem;
         }
+
         .grid {
             display: grid;
             grid-template-columns: 380px 1fr;
             gap: 2rem;
         }
+
         @media (max-width: 900px) {
-            .grid { grid-template-columns: 1fr; }
+            .grid {
+                grid-template-columns: 1fr;
+            }
         }
+
         .panel {
             background: var(--bg-alt);
             padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
+
         .form-group {
             margin-bottom: 1rem;
         }
+
         label {
             display: block;
             font-size: 0.75rem;
@@ -124,7 +155,9 @@
             color: var(--fg-dim);
             margin-bottom: 0.5rem;
         }
-        input, select {
+
+        input,
+        select {
             width: 100%;
             background: var(--bg);
             border: 1px solid var(--fg-dim);
@@ -133,15 +166,23 @@
             font-family: inherit;
             font-size: 0.9rem;
         }
-        input:focus, select:focus, textarea:focus {
+
+        input:focus,
+        select:focus,
+        textarea:focus {
             outline: none;
             border-color: var(--accent);
         }
+
         .form-row {
             display: flex;
             gap: 1rem;
         }
-        .form-row .form-group { flex: 1; }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
         textarea {
             width: 100%;
             min-height: 200px;
@@ -153,32 +194,38 @@
             font-size: 0.9rem;
             resize: vertical;
         }
+
         .status {
             padding: 0.75rem 1rem;
             margin-bottom: 1rem;
             font-size: 0.85rem;
         }
+
         .status.success {
             background: rgba(133, 153, 0, 0.1);
             border: 1px solid var(--success);
             color: var(--success);
         }
+
         .status.error {
             background: rgba(220, 50, 47, 0.1);
             border: 1px solid var(--error);
             color: var(--error);
         }
+
         .status.info {
             background: rgba(38, 139, 210, 0.1);
             border: 1px solid var(--accent);
             color: var(--accent);
         }
+
         .tabs {
             display: flex;
             gap: 0;
             margin-bottom: 1.5rem;
             border-bottom: 1px solid var(--bg-alt);
         }
+
         .tab {
             background: transparent;
             border: none;
@@ -192,13 +239,24 @@
             letter-spacing: 0.1em;
             transition: all 0.15s;
         }
-        .tab:hover { color: var(--fg); }
+
+        .tab:hover {
+            color: var(--fg);
+        }
+
         .tab.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
         }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .connection-item {
             display: flex;
             justify-content: space-between;
@@ -208,34 +266,41 @@
             border: 1px solid var(--fg-dim);
             margin-bottom: 0.5rem;
         }
+
         .connection-item:hover {
             border-color: var(--accent);
         }
+
         .connection-info h3 {
             font-size: 0.9rem;
             font-weight: normal;
             color: var(--fg-bright);
             margin-bottom: 0.2rem;
         }
+
         .connection-info p {
             font-size: 0.75rem;
             color: var(--fg-dim);
         }
+
         .connection-actions {
             display: flex;
             gap: 0.5rem;
         }
+
         .results-container {
             background: var(--bg-alt);
             padding: 1rem;
             max-height: 500px;
             overflow: auto;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
         }
+
         th {
             text-align: left;
             font-weight: normal;
@@ -248,22 +313,27 @@
             top: 0;
             background: var(--bg-alt);
         }
+
         td {
             padding: 0.5rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
+
         tr:hover td {
-            background: rgba(255,255,255,0.02);
+            background: rgba(255, 255, 255, 0.02);
         }
+
         .value-cell {
             color: var(--cyan);
             text-align: right;
         }
+
         .empty {
             text-align: center;
             padding: 2rem;
             color: var(--fg-dim);
         }
+
         .spinner {
             display: inline-block;
             width: 16px;
@@ -274,52 +344,73 @@
             animation: spin 0.8s linear infinite;
             margin-right: 0.5rem;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .fade-in {
             animation: fadeIn 0.3s ease-out forwards;
             opacity: 0;
         }
-        @keyframes fadeIn { to { opacity: 1; } }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
         .actions {
             display: flex;
             gap: 0.5rem;
             margin-top: 1rem;
         }
+
         .row-count {
             font-size: 0.8rem;
             color: var(--fg-dim);
             margin-bottom: 0.5rem;
         }
+
         a {
             color: var(--accent);
             text-decoration: none;
         }
+
         a:hover {
             text-decoration: underline;
         }
+
         .nav-link {
             font-size: 0.85rem;
         }
+
         .cube-item {
             padding: 0.4rem 0.5rem;
             cursor: pointer;
             color: var(--accent);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
+
         .cube-item:hover {
-            background: rgba(255,255,255,0.02);
+            background: rgba(255, 255, 255, 0.02);
         }
+
         .dim-item {
             padding: 0.3rem 0.5rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
+
         .dim-num {
             color: var(--cyan);
             font-weight: bold;
             width: 20px;
         }
+
         .conn-count {
             font-size: 0.75rem;
             color: var(--fg-dim);
@@ -327,21 +418,22 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header class="fade-in">
             <h1>TM1 <span>Data Connector</span></h1>
             <a href="/pyrest" class="btn nav-link">Back to PyRest</a>
         </header>
-        
+
         <div class="tabs fade-in">
             <button class="tab active" data-tab="connections">Connections</button>
             <button class="tab" data-tab="query">MDX Query</button>
             <button class="tab" data-tab="cubes">Browse Cubes</button>
         </div>
-        
+
         <div id="message-area"></div>
-        
+
         <!-- Connections Tab -->
         <div id="connections" class="tab-content active fade-in">
             <div class="grid">
@@ -350,11 +442,11 @@
                         <h2>Add Connection</h2>
                         <form id="connection-form">
                             <div class="form-group">
-                                <label>Connection Name</label>
+                                <label for="conn-name">Connection Name</label>
                                 <input type="text" id="conn-name" placeholder="e.g., Production" required>
                             </div>
                             <div class="form-group">
-                                <label>Type</label>
+                                <label for="conn-type">Type</label>
                                 <select id="conn-type">
                                     <option value="onprem">On-Premise</option>
                                     <option value="cloud">IBM Cloud (PAW)</option>
@@ -362,16 +454,16 @@
                             </div>
                             <div id="onprem-fields">
                                 <div class="form-group">
-                                    <label>Server Address</label>
+                                    <label for="conn-address">Server Address</label>
                                     <input type="text" id="conn-address" placeholder="tm1server.company.com">
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>Port</label>
+                                        <label for="conn-port">Port</label>
                                         <input type="number" id="conn-port" value="8010">
                                     </div>
                                     <div class="form-group">
-                                        <label>SSL</label>
+                                        <label for="conn-ssl">SSL</label>
                                         <select id="conn-ssl">
                                             <option value="true">Yes</option>
                                             <option value="false">No</option>
@@ -381,20 +473,21 @@
                             </div>
                             <div id="cloud-fields" style="display: none;">
                                 <div class="form-group">
-                                    <label>TM1 Server URL</label>
-                                    <input type="text" id="conn-cloud-url" placeholder="https://xxx.planning-analytics.ibmcloud.com">
+                                    <label for="conn-cloud-url">TM1 Server URL</label>
+                                    <input type="text" id="conn-cloud-url"
+                                        placeholder="https://xxx.planning-analytics.ibmcloud.com">
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Username</label>
+                                <label for="conn-user">Username</label>
                                 <input type="text" id="conn-user" placeholder="admin">
                             </div>
                             <div class="form-group">
-                                <label>Password</label>
+                                <label for="conn-password">Password</label>
                                 <input type="password" id="conn-password">
                             </div>
                             <div class="form-group">
-                                <label>Namespace (CAM only)</label>
+                                <label for="conn-namespace">Namespace (CAM only)</label>
                                 <input type="text" id="conn-namespace" placeholder="Leave empty for native auth">
                             </div>
                             <div class="actions">
@@ -405,7 +498,7 @@
                         <div id="connection-status" style="margin-top: 1rem;"></div>
                     </div>
                 </div>
-                
+
                 <div class="main">
                     <div class="panel">
                         <h2>Saved Connections <span id="conn-count" class="conn-count">(0)</span></h2>
@@ -416,7 +509,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- MDX Query Tab -->
         <div id="query" class="tab-content fade-in">
             <div class="grid">
@@ -424,14 +517,14 @@
                     <div class="panel">
                         <h2>Connection</h2>
                         <div class="form-group">
-                            <label>Instance</label>
+                            <label for="query-instance">Instance</label>
                             <select id="query-instance">
                                 <option value="">Select connection...</option>
                             </select>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="main">
                     <div class="panel">
                         <h2>MDX Query</h2>
@@ -444,7 +537,7 @@ FROM [SalesCube]"></textarea>
                             <button class="btn" onclick="clearQuery()">Clear</button>
                         </div>
                     </div>
-                    
+
                     <div class="panel" id="results-panel" style="display: none;">
                         <h2>Results</h2>
                         <div id="query-status"></div>
@@ -459,7 +552,7 @@ FROM [SalesCube]"></textarea>
                 </div>
             </div>
         </div>
-        
+
         <!-- Browse Cubes Tab -->
         <div id="cubes" class="tab-content fade-in">
             <div class="grid">
@@ -467,19 +560,20 @@ FROM [SalesCube]"></textarea>
                     <div class="panel">
                         <h2>Instance</h2>
                         <div class="form-group">
+                            <label for="cube-instance">Instance</label>
                             <select id="cube-instance">
                                 <option value="">Select connection...</option>
                             </select>
                         </div>
                         <button class="btn primary" onclick="loadCubes()" style="width: 100%;">Load Cubes</button>
                     </div>
-                    
+
                     <div class="panel" id="cubes-panel" style="display: none;">
                         <h2>Cubes <span id="cube-count" class="conn-count">(0)</span></h2>
                         <div id="cube-list" style="max-height: 400px; overflow-y: auto;"></div>
                     </div>
                 </div>
-                
+
                 <div class="main">
                     <div class="panel">
                         <h2 id="cube-detail-title">Cube Details</h2>
@@ -496,32 +590,32 @@ FROM [SalesCube]"></textarea>
         // ============================================
         // TM1 Data Connector
         // ============================================
-        
+
         var API_BASE = '/pyrest/tm1data';
         var STORAGE_KEY = 'tm1_connections';
-        
+
         // Storage
         function getConnections() {
             var data = localStorage.getItem(STORAGE_KEY);
             return data ? JSON.parse(data) : {};
         }
-        
+
         function saveConnections(connections) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
         }
-        
+
         // Tabs
-        document.querySelectorAll('.tab').forEach(function(tab) {
-            tab.addEventListener('click', function() {
-                document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-                document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+        document.querySelectorAll('.tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+                document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active'); });
                 tab.classList.add('active');
                 document.getElementById(tab.dataset.tab).classList.add('active');
             });
         });
-        
+
         // Connection type toggle
-        document.getElementById('conn-type').addEventListener('change', function() {
+        document.getElementById('conn-type').addEventListener('change', function () {
             var onprem = document.getElementById('onprem-fields');
             var cloud = document.getElementById('cloud-fields');
             if (this.value === 'cloud') {
@@ -532,33 +626,33 @@ FROM [SalesCube]"></textarea>
                 cloud.style.display = 'none';
             }
         });
-        
+
         // Messages
         function showMessage(text, type) {
             var area = document.getElementById('message-area');
             area.innerHTML = '<div class="status ' + type + '">' + text + '</div>';
-            setTimeout(function() { area.innerHTML = ''; }, 5000);
+            setTimeout(function () { area.innerHTML = ''; }, 5000);
         }
-        
+
         function showStatus(elementId, message, type) {
             var el = document.getElementById(elementId);
             el.innerHTML = '<div class="status ' + type + '">' + message + '</div>';
         }
-        
+
         // Connection Management
         function renderConnections() {
             var connections = getConnections();
             var list = document.getElementById('connection-list');
             var names = Object.keys(connections);
-            
+
             document.getElementById('conn-count').textContent = '(' + names.length + ')';
-            
+
             // Update dropdowns
-            ['query-instance', 'cube-instance'].forEach(function(id) {
+            ['query-instance', 'cube-instance'].forEach(function (id) {
                 var select = document.getElementById(id);
                 var currentVal = select.value;
                 select.innerHTML = '<option value="">Select connection...</option>';
-                names.forEach(function(name) {
+                names.forEach(function (name) {
                     var opt = document.createElement('option');
                     opt.value = name;
                     opt.textContent = name;
@@ -566,59 +660,59 @@ FROM [SalesCube]"></textarea>
                 });
                 select.value = currentVal;
             });
-            
+
             if (names.length === 0) {
                 list.innerHTML = '<div class="empty">No connections configured. Add one to get started.</div>';
                 return;
             }
-            
-            list.innerHTML = names.map(function(name) {
+
+            list.innerHTML = names.map(function (name) {
                 var conn = connections[name];
                 var address = conn.type === 'cloud' ? 'IBM Cloud' : conn.address + ':' + conn.port;
                 return '<div class="connection-item">' +
                     '<div class="connection-info">' +
-                        '<h3>' + escapeHtml(name) + '</h3>' +
-                        '<p>' + escapeHtml(address) + ' | ' + escapeHtml(conn.user || 'no user') + '</p>' +
+                    '<h3>' + escapeHtml(name) + '</h3>' +
+                    '<p>' + escapeHtml(address) + ' | ' + escapeHtml(conn.user || 'no user') + '</p>' +
                     '</div>' +
                     '<div class="connection-actions">' +
-                        '<button class="btn btn-sm success" onclick="testSavedConnection(\'' + escapeHtml(name) + '\')">Test</button>' +
-                        '<button class="btn btn-sm danger" onclick="deleteConnection(\'' + escapeHtml(name) + '\')">Delete</button>' +
+                    '<button class="btn btn-sm success" onclick="testSavedConnection(\'' + escapeHtml(name) + '\')">Test</button>' +
+                    '<button class="btn btn-sm danger" onclick="deleteConnection(\'' + escapeHtml(name) + '\')">Delete</button>' +
                     '</div>' +
-                '</div>';
+                    '</div>';
             }).join('');
         }
-        
-        document.getElementById('connection-form').addEventListener('submit', function(e) {
+
+        document.getElementById('connection-form').addEventListener('submit', function (e) {
             e.preventDefault();
-            
+
             var name = document.getElementById('conn-name').value.trim();
             var type = document.getElementById('conn-type').value;
-            
+
             var connection = {
                 type: type,
                 user: document.getElementById('conn-user').value,
                 password: document.getElementById('conn-password').value,
                 namespace: document.getElementById('conn-namespace').value
             };
-            
+
             if (type === 'cloud') {
                 connection.cloudUrl = document.getElementById('conn-cloud-url').value;
             } else {
                 connection.address = document.getElementById('conn-address').value;
-                connection.port = parseInt(document.getElementById('conn-port').value) || 8010;
+                connection.port = Number.parseInt(document.getElementById('conn-port').value) || 8010;
                 connection.ssl = document.getElementById('conn-ssl').value === 'true';
             }
-            
+
             var connections = getConnections();
             connections[name] = connection;
             saveConnections(connections);
-            
+
             this.reset();
             document.getElementById('conn-port').value = '8010';
             renderConnections();
             showMessage('Connection "' + name + '" saved', 'success');
         });
-        
+
         function deleteConnection(name) {
             if (!confirm('Delete connection "' + name + '"?')) return;
             var connections = getConnections();
@@ -627,7 +721,7 @@ FROM [SalesCube]"></textarea>
             renderConnections();
             showMessage('Connection "' + name + '" deleted', 'info');
         }
-        
+
         function testConnection() {
             var address = document.getElementById('conn-address').value || 'localhost';
             var port = document.getElementById('conn-port').value || '8010';
@@ -635,21 +729,22 @@ FROM [SalesCube]"></textarea>
             var protocol = ssl ? 'https' : 'http';
             showStatus('connection-status', 'Connection configured: ' + protocol + '://' + address + ':' + port, 'info');
         }
-        
+
         function testSavedConnection(name) {
             var connections = getConnections();
             var conn = connections[name];
             if (!conn) return;
-            
-            var address = conn.type === 'cloud' ? conn.cloudUrl : (conn.ssl ? 'https' : 'http') + '://' + conn.address + ':' + conn.port;
+
+            var protocol = conn.ssl ? 'https' : 'http';
+            var address = conn.type === 'cloud' ? conn.cloudUrl : protocol + '://' + conn.address + ':' + conn.port;
             showMessage('Testing "' + name + '": ' + address, 'info');
         }
-        
+
         // MDX Query
         function executeQuery() {
             var instance = document.getElementById('query-instance').value;
             var mdx = document.getElementById('mdx-query').value.trim();
-            
+
             if (!instance) {
                 showMessage('Please select a connection', 'error');
                 return;
@@ -658,18 +753,18 @@ FROM [SalesCube]"></textarea>
                 showMessage('Please enter an MDX query', 'error');
                 return;
             }
-            
+
             document.getElementById('results-panel').style.display = 'block';
             showStatus('query-status', '<span class="spinner"></span> Executing...', 'info');
             document.getElementById('results-container').innerHTML = '<div class="empty"><span class="spinner"></span> Loading...</div>';
-            
+
             // Demo results
-            setTimeout(function() {
+            setTimeout(function () {
                 showStatus('query-status', 'Query executed (demo mode)', 'success');
                 renderDemoResults();
             }, 500);
         }
-        
+
         function renderDemoResults() {
             var demoData = [
                 { coords: ['2024', 'Sales', 'North'], value: 125000 },
@@ -679,38 +774,38 @@ FROM [SalesCube]"></textarea>
                 { coords: ['2026', 'Sales', 'North'], value: 168000 },
                 { coords: ['2026', 'Sales', 'South'], value: 134000 }
             ];
-            
+
             document.getElementById('row-count').textContent = demoData.length + ' rows (demo data)';
-            
+
             var html = '<table><thead><tr><th>Year</th><th>Measure</th><th>Region</th><th>Value</th></tr></thead><tbody>';
-            demoData.forEach(function(row) {
+            demoData.forEach(function (row) {
                 html += '<tr>';
-                row.coords.forEach(function(c) { html += '<td>' + c + '</td>'; });
+                row.coords.forEach(function (c) { html += '<td>' + c + '</td>'; });
                 html += '<td class="value-cell">' + row.value.toLocaleString() + '</td></tr>';
             });
             html += '</tbody></table>';
-            
+
             document.getElementById('results-container').innerHTML = html;
         }
-        
+
         function clearQuery() {
             document.getElementById('mdx-query').value = '';
             document.getElementById('results-panel').style.display = 'none';
         }
-        
+
         function exportCsv() {
             var table = document.querySelector('#results-container table');
             if (!table) return;
-            
+
             var csv = [];
-            table.querySelectorAll('tr').forEach(function(row) {
+            table.querySelectorAll('tr').forEach(function (row) {
                 var cols = [];
-                row.querySelectorAll('td, th').forEach(function(cell) {
+                row.querySelectorAll('td, th').forEach(function (cell) {
                     cols.push('"' + cell.textContent + '"');
                 });
                 csv.push(cols.join(','));
             });
-            
+
             var blob = new Blob([csv.join('\n')], { type: 'text/csv' });
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
@@ -719,7 +814,7 @@ FROM [SalesCube]"></textarea>
             a.click();
             URL.revokeObjectURL(url);
         }
-        
+
         // Cube Browser
         function loadCubes() {
             var instance = document.getElementById('cube-instance').value;
@@ -727,41 +822,42 @@ FROM [SalesCube]"></textarea>
                 showMessage('Please select a connection', 'error');
                 return;
             }
-            
+
             // Demo cubes
             var demoCubes = ['SalesCube', 'BudgetCube', 'ForecastCube', 'ActualsCube', 'VarianceCube', 'InventoryCube'];
-            
+
             document.getElementById('cubes-panel').style.display = 'block';
             document.getElementById('cube-count').textContent = '(' + demoCubes.length + ')';
-            
-            var html = demoCubes.map(function(cube) {
+
+            var html = demoCubes.map(function (cube) {
                 return '<div class="cube-item" onclick="loadCubeDetails(\'' + cube + '\')">' + cube + '</div>';
             }).join('');
-            
+
             document.getElementById('cube-list').innerHTML = html;
             showMessage('Loaded ' + demoCubes.length + ' cubes (demo mode)', 'info');
         }
-        
+
         function loadCubeDetails(cubeName) {
             document.getElementById('cube-detail-title').textContent = cubeName;
-            
+
             var demoDims = ['Account', 'Time', 'Region', 'Product', 'Scenario', 'Measures'];
-            
-            var html = demoDims.map(function(dim, i) {
+
+            var html = demoDims.map(function (dim, i) {
                 return '<div class="dim-item"><span class="dim-num">' + (i + 1) + '</span><span>' + dim + '</span></div>';
             }).join('');
-            
+
             document.getElementById('cube-details').innerHTML = html;
         }
-        
+
         function escapeHtml(text) {
             var div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-        
+
         // Init
         renderConnections();
     </script>
 </body>
+
 </html>
