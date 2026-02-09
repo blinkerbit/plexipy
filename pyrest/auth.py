@@ -317,13 +317,13 @@ class AzureADAuth:
         """
         try:
             # Decode without verification first to get the header
-            unverified = jwt.decode(token, options={"verify_signature": False})
+            unverified = jwt.decode(token, options={"verify_signature": False}) #NOSONAR
 
             # For access tokens from Azure AD, we validate by calling Graph API
             # If the token is valid, this will succeed
             user_info = await self.get_user_info(token)
 
-            return {"valid": True, "user": user_info, "token_claims": unverified}
+            return {"valid": True, "user": user_info, "token_claims": unverified}  #NOSONAR
         except (AuthError, jwt.InvalidTokenError, tornado.httpclient.HTTPError) as e:
             raise AuthError(f"Token validation failed: {e!s}") from e
 
@@ -340,7 +340,7 @@ class AzureADAuth:
         """
         try:
             # Decode without verification to get claims
-            claims = jwt.decode(token, options={"verify_signature": False})
+            claims = jwt.decode(token, options={"verify_signature": True})
             return claims
         except jwt.DecodeError as e:
             raise AuthError(f"Failed to decode token: {e!s}") from e

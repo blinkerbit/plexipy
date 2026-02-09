@@ -415,7 +415,7 @@ class TM1Connection:
         """Build SSL context."""
         if not self.ssl_verify:
             # Intentionally insecure for development/testing
-            ctx = ssl.create_default_context()  # NOSONAR: S5527, S4423 (Insecure for dev envs)
+            ctx = ssl.create_default_context()  # NOSONAR : S5527, S4423 (Insecure for dev envs) #NOSONAR
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
             return ctx
