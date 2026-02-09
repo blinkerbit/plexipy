@@ -107,7 +107,7 @@ class TestTM1InstanceConfig:
             "port": "8010",
             "ssl": True,
             "user": "admin",
-            "password": "secret",
+            "password": "secret", #NOSONAR
         }
 
         instance = TM1InstanceConfig("test", config)
@@ -135,7 +135,7 @@ class TestTM1InstanceConfig:
             "connection_type": "onprem",
             "server": "localhost",
             "user": "admin",
-            "password": "secret",
+            "password": "secret", #NOSONAR
             "namespace": "LDAP",
             "gateway": "https://cam.local",
         }

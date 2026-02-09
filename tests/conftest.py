@@ -200,7 +200,7 @@ def sample_tm1_config() -> dict[str, Any]:
                 "port": "8010",
                 "ssl": True,
                 "user": "admin",
-                "password": "secret",
+                "password": "secret", #NOSONAR
             },
             "development": {
                 "description": "Development TM1 Server",
