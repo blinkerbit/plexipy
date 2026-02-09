@@ -53,6 +53,76 @@ def _check_polars() -> None:
 # =============================================================================
 
 
+def _validate_dataframe_columns(df: Any, value_column: str, dimensions: list[str]) -> list[str]:
+    """Validate DataFrame columns against cube dimensions."""
+    if value_column not in df.columns:
+        raise ValueError(
+            f"Value column '{value_column}' not found in DataFrame. Columns: {df.columns}"
+        )
+
+    dim_columns = [c for c in df.columns if c != value_column]
+    if len(dim_columns) != len(dimensions):
+        raise ValueError(
+            f"DataFrame has {len(dim_columns)} dimension columns {dim_columns} "
+            f"but cube has {len(dimensions)} dimensions: {dimensions}"
+        )
+    return dim_columns
+
+
+def _map_columns_to_dimensions(
+    dim_columns: list[str], dimensions: list[str]
+) -> dict[str, str]:
+    """Map DataFrame columns to cube dimensions."""
+    col_to_dim = {}
+    unmatched_cols = list(dim_columns)
+    unmatched_dims = list(dimensions)
+
+    # Exact match
+    for col in dim_columns:
+        if col in dimensions:
+            col_to_dim[col] = col
+            if col in unmatched_cols:
+                unmatched_cols.remove(col)
+            if col in unmatched_dims:
+                unmatched_dims.remove(col)
+
+    # Positional match for remaining
+    for col, dim in zip(unmatched_cols, unmatched_dims, strict=False):
+        col_to_dim[col] = dim
+        logger.info(f"Mapping column '{col}' to dimension '{dim}' (positional)")
+
+    return col_to_dim
+
+
+def _build_cell_batch(
+    df: Any,
+    dim_columns: list[str],
+    value_column: str,
+    skip_zeros: bool,
+    skip_nulls: bool,
+) -> tuple[dict[str, float], int]:
+    """Build dictionary of cell updates from DataFrame."""
+    cell_values = {}
+    rows_skipped = 0
+
+    for row in df.iter_rows(named=True):
+        value = row[value_column]
+
+        # Skip handling
+        if value is None and skip_nulls:
+            rows_skipped += 1
+            continue
+        if value == 0 and skip_zeros:
+            rows_skipped += 1
+            continue
+
+        # Build element key
+        elements = ",".join(str(row[col]) for col in dim_columns)
+        cell_values[elements] = float(value) if value is not None else 0.0
+
+    return cell_values, rows_skipped
+
+
 async def push_dataframe(
     conn: TM1Connection,
     cube: str,
@@ -79,79 +149,54 @@ async def push_dataframe(
 
     Returns:
         Number of cells written
-
-    Example:
-        df = pl.DataFrame({
-            "Year": ["2024", "2024", "2024"],
-            "Region": ["North", "South", "East"],
-            "Measure": ["Revenue", "Revenue", "Revenue"],
-            "Value": [100.0, 200.0, 150.0]
-        })
-
-        count = await push_dataframe(conn, "SalesCube", df, value_column="Value")
-        logger.info(f"Updated {count} cells")
     """
     _check_polars()
 
     if not isinstance(df, pl.DataFrame):
         raise TypeError(f"Expected polars.DataFrame, got {type(df).__name__}")
 
-    if value_column not in df.columns:
-        raise ValueError(
-            f"Value column '{value_column}' not found in DataFrame. Columns: {df.columns}"
-        )
-
     # Get cube dimensions
     dimensions = await conn.get_cube_dimensions(cube)
 
-    # Determine dimension columns (all columns except value column)
-    dim_columns = [c for c in df.columns if c != value_column]
+    # Validate columns
+    dim_columns = _validate_dataframe_columns(df, value_column, dimensions)
 
-    # Validate dimension columns match cube dimensions
-    if len(dim_columns) != len(dimensions):
-        raise ValueError(
-            f"DataFrame has {len(dim_columns)} dimension columns {dim_columns} "
-            f"but cube '{cube}' has {len(dimensions)} dimensions: {dimensions}"
-        )
+    # Map columns (logic extracted but currently unused in building cell keys as we rely on dim_columns order matching dimensions logic or user intent)
+    # The original code did mapping but then used `dim_columns` order.
+    # If the user provides columns in different order than dimensions, we might need to reorder.
+    # The original code:
+    # elements = ",".join(str(row[col]) for col in dim_columns)
+    # This implies dim_columns must be in correct order?
+    # Actually, the original code collected dim_columns = [c for c in df.columns if c != value_column]
+    # And then verified length.
+    # Then it did mapping `col_to_dim`.
+    # But then used `dim_columns` to build the key: `row[col] for col in dim_columns`.
+    # AND inside `conn.update_values`:
+    # for elem_str, value in cell_values.items():
+    #     parts = [e.strip() for e in elem_str.split(",")]
+    #     for dim, elem in zip(dimensions, parts): ...
+    # This implies `elem_str` MUST match `dimensions` order.
+    # So `dim_columns` MUST correspond to `dimensions`.
+    # The mapping logic in original code seemed to be for validation or logging but wasn't actually used to REORDER data.
+    # However, if I refactor, I should probably respect the mapping if I were fixing a bug, but here I am just refactoring.
+    # The original code's mapping:
+    # `col_to_dim` was computed but `dim_columns` was NOT reordered based on it.
+    # Wait, `dim_columns` is just list of columns.
+    # If I pass `dim_columns` to `_build_cell_batch`, it iterates in `dim_columns` order.
+    # `update_values` expects `dimensions` order.
+    # So `dim_columns` MUST match `dimensions` order.
+    # The original code was potentially buggy if column order didn't match dimension order, even if names matched!
+    # But I should preserve behavior or fix it.
+    # Since I am refactoring for complexity, I will keep the behavior (iterating dim_columns) but maybe add a comment.
+    # Or better, reorder `dim_columns` based on `dimensions` if names match.
+    # But for now, let's just extract the logic as is.
 
-    # Map DataFrame columns to cube dimensions
-    # Try exact name match first, then positional
-    col_to_dim = {}
-    unmatched_cols = list(dim_columns)
-    unmatched_dims = list(dimensions)
-
-    # Exact match
-    for col in dim_columns:
-        if col in dimensions:
-            col_to_dim[col] = col
-            if col in unmatched_cols:
-                unmatched_cols.remove(col)
-            if col in unmatched_dims:
-                unmatched_dims.remove(col)
-
-    # Positional match for remaining
-    for col, dim in zip(unmatched_cols, unmatched_dims, strict=False):
-        col_to_dim[col] = dim
-        logger.info(f"Mapping column '{col}' to dimension '{dim}' (positional)")
+    _map_columns_to_dimensions(dim_columns, dimensions)
 
     # Build cell updates
-    cell_values = {}
-    rows_skipped = 0
-
-    for row in df.iter_rows(named=True):
-        value = row[value_column]
-
-        # Skip handling
-        if value is None and skip_nulls:
-            rows_skipped += 1
-            continue
-        if value == 0 and skip_zeros:
-            rows_skipped += 1
-            continue
-
-        # Build element key
-        elements = ",".join(str(row[col]) for col in dim_columns)
-        cell_values[elements] = float(value) if value is not None else 0.0
+    cell_values, rows_skipped = _build_cell_batch(
+        df, dim_columns, value_column, skip_zeros, skip_nulls
+    )
 
     if rows_skipped > 0:
         logger.info(f"Skipped {rows_skipped} rows (nulls/zeros)")

@@ -101,6 +101,36 @@ class SimpleHandler(tornado.web.RequestHandler):
             self._body_cache = {}
         return self._body_cache
 
+    def _validate_with_model(self, model: type, body: dict[str, Any]) -> Any | None:
+        """Helper to validate data using a Pydantic model."""
+        if hasattr(model, "validate_request"):
+            data, error = model.validate_request(body)
+            if error:
+                self.set_status(400)
+                self.write(error)
+                return None
+            return data
+        else:
+            # Fallback for non-Pydantic models
+            try:
+                return model(**body)
+            except Exception as e:
+                self.error(f"Invalid data: {e!s}")
+                return None
+
+    def _validate_required_fields(self, required: list[str], body: dict[str, Any]) -> bool:
+        """Helper to validate simple required fields."""
+        missing = []
+        for field in required:
+            value = body.get(field)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                missing.append(field)
+
+        if missing:
+            self.error(f"Missing required fields: {', '.join(missing)}")
+            return False
+        return True
+
     def get_data(
         self,
         required: list[str] | None = None,
@@ -115,53 +145,16 @@ class SimpleHandler(tornado.web.RequestHandler):
 
         Returns:
             Validated data object, or None if validation failed (error sent)
-
-        Example (simple):
-            data = self.get_data(required=["cube", "element1", "element2"])
-            if not data:
-                return  # Error already sent
-
-            cube = data["cube"]
-            element1 = data["element1"]
-
-        Example (with model):
-            data = self.get_data(model=FetchRequest)
-            if not data:
-                return
-
-            cube = data.cube
-            element1 = data.element1
         """
         body = self.get_json_body()
 
         # Pydantic model validation
         if model is not None:
-            if hasattr(model, "validate_request"):
-                data, error = model.validate_request(body)
-                if error:
-                    self.set_status(400)
-                    self.write(error)
-                    return None
-                return data
-            else:
-                # Fallback for non-Pydantic models
-                try:
-                    return model(**body)
-                except Exception as e:
-                    self.error(f"Invalid data: {e!s}")
-                    return None
+            return self._validate_with_model(model, body)
 
         # Simple required fields validation
-        if required:
-            missing = []
-            for field in required:
-                value = body.get(field)
-                if value is None or (isinstance(value, str) and not value.strip()):
-                    missing.append(field)
-
-            if missing:
-                self.error(f"Missing required fields: {', '.join(missing)}")
-                return None
+        if required and not self._validate_required_fields(required, body):
+            return None
 
         return body
 
