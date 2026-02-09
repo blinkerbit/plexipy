@@ -305,6 +305,67 @@ class AppLoader:
         app_config.port = port
         return port
 
+    def _process_isolated_app(self, app_config: AppConfig) -> None:
+        """Helper to process an isolated app."""
+        try:
+            self._assign_port(app_config)
+            self.isolated_apps[app_config.name] = app_config
+            logger.info(
+                f"Discovered isolated app '{app_config.name}' (port: {app_config.port})"
+            )
+        except Exception as e:
+            error_msg = f"Failed to setup isolated app: {e!s}"
+            logger.exception(f"Error setting up isolated app {app_config.name}: {e}")
+            self.failed_apps[app_config.name] = {
+                "name": app_config.name,
+                "path": str(app_config.path),
+                "error": error_msg,
+                "error_type": "isolated_setup_error",
+                "isolated": True,
+            }
+
+    def _process_embedded_app(self, app_config: AppConfig) -> list[tuple]:
+        """Helper to process an embedded app."""
+        handlers = []
+        try:
+            module = self.load_app_module(app_config)
+
+            if module:
+                handlers = self.get_app_handlers(app_config, module)
+                if handlers:
+                    self.loaded_apps[app_config.name] = app_config
+                    logger.info(
+                        f"Loaded embedded app '{app_config.name}' with {len(handlers)} handlers"
+                    )
+                else:
+                    # Module loaded but no handlers found
+                    error_msg = "No handlers found in module"
+                    logger.warning(f"App {app_config.name} loaded but has no handlers")
+                    self.failed_apps[app_config.name] = {
+                        "name": app_config.name,
+                        "path": str(app_config.path),
+                        "error": error_msg,
+                        "error_type": "no_handlers",
+                    }
+            # Module failed to load
+            elif app_config.name not in self.failed_apps:
+                self.failed_apps[app_config.name] = {
+                    "name": app_config.name,
+                    "path": str(app_config.path),
+                    "error": "Failed to load module",
+                    "error_type": "module_load_error",
+                }
+        except Exception as e:
+            error_msg = f"Error loading embedded app: {e!s}"
+            logger.exception(f"Error loading embedded app {app_config.name}: {e}")
+            self.failed_apps[app_config.name] = {
+                "name": app_config.name,
+                "path": str(app_config.path),
+                "error": error_msg,
+                "error_type": "load_error",
+            }
+        return handlers
+
     def load_all_apps(self, app_filter: str | None = None) -> list[tuple]:
         """
         Discover and load all apps, returning handlers for embedded apps.
@@ -332,63 +393,11 @@ class AppLoader:
         for app_config in apps:
             try:
                 if app_config.is_isolated:
-                    # Isolated app - assign port and store for later spawning
-                    try:
-                        self._assign_port(app_config)
-                        self.isolated_apps[app_config.name] = app_config
-                        logger.info(
-                            f"Discovered isolated app '{app_config.name}' (port: {app_config.port})"
-                        )
-                    except Exception as e:
-                        error_msg = f"Failed to setup isolated app: {e!s}"
-                        logger.exception(f"Error setting up isolated app {app_config.name}: {e}")
-                        self.failed_apps[app_config.name] = {
-                            "name": app_config.name,
-                            "path": str(app_config.path),
-                            "error": error_msg,
-                            "error_type": "isolated_setup_error",
-                            "isolated": True,
-                        }
+                    self._process_isolated_app(app_config)
                 else:
-                    # Embedded app - load handlers into main process
-                    try:
-                        module = self.load_app_module(app_config)
-
-                        if module:
-                            handlers = self.get_app_handlers(app_config, module)
-                            if handlers:
-                                all_handlers.extend(handlers)
-                                self.loaded_apps[app_config.name] = app_config
-                                logger.info(
-                                    f"Loaded embedded app '{app_config.name}' with {len(handlers)} handlers"
-                                )
-                            else:
-                                # Module loaded but no handlers found
-                                error_msg = "No handlers found in module"
-                                logger.warning(f"App {app_config.name} loaded but has no handlers")
-                                self.failed_apps[app_config.name] = {
-                                    "name": app_config.name,
-                                    "path": str(app_config.path),
-                                    "error": error_msg,
-                                    "error_type": "no_handlers",
-                                }
-                        # Module failed to load
-                        elif app_config.name not in self.failed_apps:
-                            self.failed_apps[app_config.name] = {
-                                "name": app_config.name,
-                                "path": str(app_config.path),
-                                "error": "Failed to load module",
-                                "error_type": "module_load_error",
-                            }
-                    except Exception as e:
-                        error_msg = f"Error loading embedded app: {e!s}"
-                        logger.exception(f"Error loading embedded app {app_config.name}: {e}")
-                        self.failed_apps[app_config.name] = {
-                            "name": app_config.name,
-                            "path": str(app_config.path),
-                            "error": error_msg,
-                            "error_type": "load_error",
-                        }
+                    handlers = self._process_embedded_app(app_config)
+                    if handlers:
+                        all_handlers.extend(handlers)
             except Exception as e:
                 # Catch any unexpected errors during app processing
                 error_msg = f"Unexpected error processing app: {e!s}"

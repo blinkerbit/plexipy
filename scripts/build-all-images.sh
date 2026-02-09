@@ -33,7 +33,7 @@ echo "║  PyRest - Build All Isolated App Images                  ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
-if [ -n "$REGISTRY" ]; then
+if [[ -n "$REGISTRY" ]]; then
     echo "Registry: $REGISTRY"
 fi
 echo "Tag:      $TAG"
@@ -44,17 +44,17 @@ echo "============================================================"
 echo "Building main framework image..."
 echo "============================================================"
 
-if [ -n "$REGISTRY" ]; then
+if [[ -n "$REGISTRY" ]]; then
     MAIN_IMAGE="$REGISTRY/pyrest-main:$TAG"
 else
     MAIN_IMAGE="pyrest-main:$TAG"
 fi
 
 MAIN_BUILD_ARGS=""
-if [ -n "${PIP_INDEX_URL:-}" ]; then
+if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     MAIN_BUILD_ARGS="$MAIN_BUILD_ARGS --build-arg PIP_INDEX_URL=$PIP_INDEX_URL"
 fi
-if [ -n "${PIP_TRUSTED_HOST:-}" ]; then
+if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
     MAIN_BUILD_ARGS="$MAIN_BUILD_ARGS --build-arg PIP_TRUSTED_HOST=$PIP_TRUSTED_HOST"
 fi
 
@@ -73,13 +73,13 @@ FAILED_COUNT=0
 FAILED_APPS=""
 
 for app_dir in "$APPS_DIR"/*/; do
-    [ -d "$app_dir" ] || continue
+    [[ -d "$app_dir" ]] || continue
 
     app_name=$(basename "$app_dir")
 
     # Skip non-isolated apps (no requirements.txt) and __pycache__
-    [ -f "$app_dir/requirements.txt" ] || continue
-    [ "$app_name" != "__pycache__" ] || continue
+    [[ -f "$app_dir/requirements.txt" ]] || continue
+    [[ "$app_name" != "__pycache__" ]] || continue
 
     echo ""
     echo "============================================================"
@@ -88,7 +88,7 @@ for app_dir in "$APPS_DIR"/*/; do
 
     if "$SCRIPT_DIR/build-app-image.sh" "$app_name" "$REGISTRY" "$TAG"; then
         ISOLATED_COUNT=$((ISOLATED_COUNT + 1))
-        if [ -n "$REGISTRY" ]; then
+        if [[ -n "$REGISTRY" ]]; then
             BUILT_IMAGES+=("$REGISTRY/pyrest-$app_name:$TAG")
         else
             BUILT_IMAGES+=("pyrest-$app_name:$TAG")
@@ -109,7 +109,7 @@ echo "  Main framework: 1"
 echo "  Isolated apps:  $ISOLATED_COUNT"
 echo "  Failed:         $FAILED_COUNT"
 
-if [ $FAILED_COUNT -gt 0 ]; then
+if [[ $FAILED_COUNT -gt 0 ]]; then
     echo "  Failed apps:   $FAILED_APPS"
 fi
 
@@ -120,7 +120,7 @@ for img in "${BUILT_IMAGES[@]}"; do
 done
 
 # Push if requested
-if [ "$PUSH" = "--push" ] && [ -n "$REGISTRY" ]; then
+if [[ "$PUSH" = "--push" && -n "$REGISTRY" ]]; then
     echo ""
     echo "Pushing images to $REGISTRY ..."
     for img in "${BUILT_IMAGES[@]}"; do

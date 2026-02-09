@@ -58,16 +58,16 @@ except ImportError:
         """Stub AppLogger for isolated execution."""
 
         def info(self, msg):
-            pass
+            pass  # Stub
 
         def debug(self, msg):
-            pass
+            pass  # Stub
 
         def warning(self, msg):
-            pass
+            pass  # Stub
 
         def error(self, msg):
-            pass
+            pass  # Stub
 
     def setup_app_logging(*args, **kwargs):
         return None
@@ -658,14 +658,17 @@ class TM1UIHandler(tornado.web.RequestHandler):
 
     async def get(self):
         """Serve the main UI page."""
+        import asyncio
+        from pathlib import Path
+
         # Get the static folder path relative to this file
         app_path = os.environ.get("PYREST_APP_PATH", os.path.dirname(__file__))
-        html_path = os.path.join(app_path, "static", "index.html")
+        html_path = Path(app_path) / "static" / "index.html"
 
         try:
-            with open(html_path, encoding="utf-8") as f:
-                self.set_header("Content-Type", "text/html")
-                self.write(f.read())
+            content = await asyncio.to_thread(html_path.read_text, encoding="utf-8")
+            self.set_header("Content-Type", "text/html")
+            self.write(content)
         except FileNotFoundError:
             self.set_status(404)
             self.write({"error": "UI not found", "path": html_path})

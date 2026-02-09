@@ -12,6 +12,8 @@ import shutil
 import sys
 from pathlib import Path
 
+DEFAULT_VENV_NAME = ".venv"
+
 logger = logging.getLogger("pyrest.venv_manager")
 
 
@@ -90,7 +92,7 @@ class VenvManager:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def get_venv_path(app_path: Path, venv_name: str = ".venv") -> Path:
+    def get_venv_path(app_path: Path, venv_name: str = DEFAULT_VENV_NAME) -> Path:
         """Get the virtual environment path for an app (inside app folder)."""
         return app_path.resolve() / venv_name
 
@@ -123,7 +125,7 @@ class VenvManager:
         """Check if an app has a requirements.txt file."""
         return (app_path / "requirements.txt").exists()
 
-    def get_app_python(self, app_path: Path, venv_name: str = ".venv") -> Path:
+    def get_app_python(self, app_path: Path, venv_name: str = DEFAULT_VENV_NAME) -> Path:
         """Return venv Python if it exists, else system Python."""
         venv_path = self.get_venv_path(app_path, venv_name)
         python_exe = self.get_python_executable(venv_path)
@@ -314,7 +316,7 @@ class VenvManager:
             logger.exception(error_msg)
             return False, error_msg
 
-    async def ensure_venv(self, app_path: Path, venv_name: str = ".venv") -> tuple[bool, Path, str]:
+    async def ensure_venv(self, app_path: Path, venv_name: str = DEFAULT_VENV_NAME) -> tuple[bool, Path, str]:
         """
         Async: ensure a virtual environment exists and has deps installed.
 
@@ -358,7 +360,7 @@ class VenvManager:
         self,
         app_path: Path,
         command: list[str],
-        venv_name: str = ".venv",
+        venv_name: str = DEFAULT_VENV_NAME,
         env: dict[str, str] | None = None,
         cwd: Path | None = None,
     ) -> asyncio.subprocess.Process:

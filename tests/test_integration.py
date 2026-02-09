@@ -15,7 +15,13 @@ import tornado.web
 
 from pyrest.handlers import BASE_PATH
 from pyrest.server import create_app
+from pyrest.server import create_app
 from tests.conftest import TEST_JWT_SECRET
+
+TEST_PASSWORD = "testpass"
+ADMIN_PASSWORD = "adminpass"
+FLOW_PASSWORD = "flowpass"
+WRONG_PASSWORD = "wrong"
 
 
 class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
@@ -168,8 +174,8 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
         from pyrest.auth import get_auth_manager
 
         mgr = get_auth_manager()
-        mgr.register_user("admin", "adminpass")
-        token = mgr.authenticate_user("admin", "adminpass")
+        mgr.register_user("admin", ADMIN_PASSWORD)
+        token = mgr.authenticate_user("admin", ADMIN_PASSWORD)
         return token
 
     def test_register_requires_auth(self):
@@ -178,7 +184,7 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
             f"{BASE_PATH}/auth/register",
             method="POST",
             body=json.dumps(
-                {"username": "testuser", "password": "testpass", "email": "test@example.com"}
+                {"username": "testuser", "password": TEST_PASSWORD, "email": "test@example.com"}
             ),
             headers={"Content-Type": "application/json"},
         )
@@ -228,7 +234,7 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
         response = self.fetch(
             f"{BASE_PATH}/auth/login",
             method="POST",
-            body=json.dumps({"username": "nonexistent", "password": "wrong"}),
+            body=json.dumps({"username": "nonexistent", "password": WRONG_PASSWORD}),
             headers={"Content-Type": "application/json"},
         )
 
@@ -304,14 +310,14 @@ class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
 
         # 0. Seed a bootstrap admin directly (simulates initial setup / CLI provisioning)
         mgr = get_auth_manager()
-        mgr.register_user("admin", "adminpass")
-        admin_token = mgr.authenticate_user("admin", "adminpass")
+        mgr.register_user("admin", ADMIN_PASSWORD)
+        admin_token = mgr.authenticate_user("admin", ADMIN_PASSWORD)
 
         # 1. Register a new user via the API (now requires auth)
         register_response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
-            body=json.dumps({"username": "flowuser", "password": "flowpass"}),
+            body=json.dumps({"username": "flowuser", "password": FLOW_PASSWORD}),
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {admin_token}",
@@ -323,7 +329,7 @@ class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
         login_response = self.fetch(
             f"{BASE_PATH}/auth/login",
             method="POST",
-            body=json.dumps({"username": "flowuser", "password": "flowpass"}),
+            body=json.dumps({"username": "flowuser", "password": FLOW_PASSWORD}),
             headers={"Content-Type": "application/json"},
         )
         assert login_response.code == 200

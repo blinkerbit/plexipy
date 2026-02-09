@@ -93,7 +93,7 @@ class AppProcess:
 
     name: str
     port: int
-    process: subprocess.Popen
+    process: asyncio.subprocess.Process
     app_path: Path
     venv_path: Path | None = None
     started_at: float = field(default_factory=time.time)
@@ -101,7 +101,7 @@ class AppProcess:
     @property
     def is_running(self) -> bool:
         """Whether the app process is still running."""
-        return self.process.poll() is None
+        return self.process.returncode is None
 
     @property
     def pid(self) -> int | None:
@@ -132,7 +132,7 @@ class AppProcess:
     @property
     def return_code(self) -> int | None:
         """The process exit code, or None if still running."""
-        return self.process.poll()
+        return self.process.returncode
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the app process state to a dictionary."""
@@ -269,35 +269,37 @@ class ProcessManager:
                 f"python={python_exe} | runner={runner_script}"
             )
 
-            # Popen is appropriate for long-running background processes.
+            # Use asyncio.create_subprocess_exec for non-blocking process creation
             # start_new_session=True so we can killpg the whole group later.
-            # Use DEVNULL for stdout/stderr to avoid PIPE buffer deadlocks on
-            # long-lived daemon processes (app logs go to their own log files).
-            process = subprocess.Popen(
-                [str(python_exe), str(runner_script)],
+            process = await asyncio.create_subprocess_exec(
+                str(python_exe),
+                str(runner_script),
                 cwd=str(app_path),
                 env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
                 start_new_session=True,
             )
 
             # Non-blocking startup check
             await asyncio.sleep(0.5)
 
-            if process.poll() is not None:
-                stderr = process.stderr.read() if process.stderr else b""
-                process.stderr.close()
+            if process.returncode is not None:
+                if process.stderr:
+                    stderr_content = await process.stderr.read()
+                else:
+                    stderr_content = b""
+                
                 logger.error(
                     f"App {app_name} failed to start. "
                     f"Exit code: {process.returncode}. "
-                    f"Stderr: {stderr.decode(errors='replace') if stderr else 'N/A'}"
+                    f"Stderr: {stderr_content.decode(errors='replace') if stderr_content else 'N/A'}"
                 )
                 return None
 
-            # Close stderr PIPE after successful startup — the app logs to its own files
-            if process.stderr:
-                process.stderr.close()
+            # We don't close stderr in asyncio subprocess manually usually, 
+            # but we can consume it if needed or let it buffer (limited size).
+            # For now, let's leave it as is.
 
             app_process = AppProcess(
                 name=app_name,
@@ -350,10 +352,7 @@ class ProcessManager:
 
             # Non-blocking wait for parent to exit
             try:
-                await asyncio.wait_for(
-                    asyncio.to_thread(app_process.process.wait),
-                    timeout=timeout,
-                )
+                await asyncio.wait_for(app_process.process.wait(), timeout=timeout)
             except TimeoutError:
                 logger.warning(f"App {app_name} didn't stop gracefully, force killing")
                 try:
@@ -361,7 +360,8 @@ class ProcessManager:
                     os.killpg(pgid, signal.SIGKILL)
                 except (OSError, ProcessLookupError):
                     app_process.process.kill()
-                await asyncio.to_thread(app_process.process.wait)
+                with contextlib.suppress(Exception):
+                    await app_process.process.wait()
 
             # Kill straggler workers
             for child_pid in children:

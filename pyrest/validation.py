@@ -208,6 +208,8 @@ else:
 # Pre-built Request Models for Common Operations
 # =============================================================================
 
+DESC_CUBE_NAME = "Cube name"
+
 if PYDANTIC_AVAILABLE:
 
     class TM1ConnectionParams(RequestModel):
@@ -245,14 +247,14 @@ if PYDANTIC_AVAILABLE:
     class FetchRequest(TM1ConnectionParams):
         """Request for fetching cell values."""
 
-        cube: str = field(description="Cube name")
+        cube: str = field(description=DESC_CUBE_NAME)
         element1: str = field(description="First element coordinates (comma-separated)")
         element2: str = field(description="Second element coordinates (comma-separated)")
 
     class UpdateRequest(TM1ConnectionParams):
         """Request for updating a cell value."""
 
-        cube: str = field(description="Cube name")
+        cube: str = field(description=DESC_CUBE_NAME)
         target_element: str = field(description="Target element coordinates (comma-separated)")
         value: float = field(description="Value to write")
 

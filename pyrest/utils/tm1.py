@@ -46,6 +46,8 @@ from typing import Any
 
 logger = logging.getLogger("pyrest.utils.tm1")
 
+DEFAULT_SESSION_CONTEXT = "PyRest TM1 App"
+
 # TM1py import (available when running in isolated venv with tm1py installed)
 try:
     from TM1py import TM1Service
@@ -159,7 +161,7 @@ class TM1InstanceConfig:
         """Check if this is a legacy on-premise instance."""
         return self.connection_type == "onprem"
 
-    def build_connection_params(self, session_context: str = "PyRest TM1 App") -> dict[str, Any]:
+    def build_connection_params(self, session_context: str = DEFAULT_SESSION_CONTEXT) -> dict[str, Any]:
         """
         Build TM1py connection parameters for this instance.
 
@@ -474,7 +476,7 @@ class TM1ConnectionManager:
     _instances: dict[str, TM1InstanceConfig] = {}
     _connections: dict[str, Any] = {}  # instance_name -> TM1Service
     _default_instance: str = "default"
-    _session_context: str = "PyRest TM1 App"
+    _session_context: str = DEFAULT_SESSION_CONTEXT
     _initialized: bool = False
     _app_logger: logging.Logger | None = None
 
@@ -497,7 +499,7 @@ class TM1ConnectionManager:
         # Get settings
         settings = app_config.get("settings", {})
         cls._default_instance = settings.get("default_instance", "default")
-        cls._session_context = settings.get("session_context", "PyRest TM1 App")
+        cls._session_context = settings.get("session_context", DEFAULT_SESSION_CONTEXT)
 
         # Resolve environment variables in default_instance
         if isinstance(cls._default_instance, str) and cls._default_instance.startswith("${"):
@@ -524,7 +526,7 @@ class TM1ConnectionManager:
         cls._connections.clear()
         cls._initialized = False
         cls._default_instance = "default"
-        cls._session_context = "PyRest TM1 App"
+        cls._session_context = DEFAULT_SESSION_CONTEXT
         logger.info("TM1ConnectionManager reset")
 
     @classmethod
@@ -616,7 +618,7 @@ class TM1ConnectionManager:
     @classmethod
     def close_all_connections(cls) -> None:
         """Close all TM1 connections."""
-        for name in list(cls._connections.keys()):
+        for name in cls._connections:
             cls.close_connection(name)
 
     @classmethod

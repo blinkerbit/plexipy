@@ -21,11 +21,14 @@ logger = logging.getLogger("pyrest.admin")
 # Admin base path
 ADMIN_PATH = f"{BASE_PATH}/admin"
 
+VENV_NAME = ".venv"
+ERROR_PROCESS_MANAGER_NOT_AVAILABLE = "Process manager not available"
+
 
 def _get_venv_info(app_path) -> dict[str, Any]:
     """Get venv status info for an isolated app."""
     app_path = Path(app_path)
-    venv_path = app_path / ".venv"
+    venv_path = app_path / VENV_NAME
     info = {
         "path": str(venv_path),
         "exists": venv_path.exists(),
@@ -410,7 +413,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
     async def _action_start(self, app_name, app) -> None:
         """Ensure venv and start the app."""
         if not self.process_manager:
-            self.error("Process manager not available", 500)
+            self.error(ERROR_PROCESS_MANAGER_NOT_AVAILABLE, 500)
             return
 
         from ..venv_manager import get_venv_manager
@@ -441,7 +444,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
     async def _action_stop(self, app_name) -> None:
         """Stop the app and all its worker processes."""
         if not self.process_manager:
-            self.error("Process manager not available", 500)
+            self.error(ERROR_PROCESS_MANAGER_NOT_AVAILABLE, 500)
             return
 
         # Get process info before stopping
@@ -477,7 +480,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
 
         venv_manager = get_venv_manager()
 
-        venv_path = Path(app.path) / ".venv"
+        venv_path = Path(app.path) / VENV_NAME
         if not venv_path.exists():
             self.success(
                 message=f"No .venv found for '{app_name}'",
@@ -501,7 +504,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
         from ..venv_manager import get_venv_manager
 
         venv_manager = get_venv_manager()
-        venv_path = Path(app.path) / ".venv"
+        venv_path = Path(app.path) / VENV_NAME
 
         if venv_path.exists():
             self.success(
@@ -538,7 +541,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
 
         venv_manager = get_venv_manager()
 
-        venv_path = Path(app.path) / ".venv"
+        venv_path = Path(app.path) / VENV_NAME
         if venv_path.exists():
             ok, msg = await venv_manager.remove_venv(venv_path)
             if not ok:
@@ -558,7 +561,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
 
         # Step 4: Start app
         if not self.process_manager:
-            self.error("Process manager not available", 500)
+            self.error(ERROR_PROCESS_MANAGER_NOT_AVAILABLE, 500)
             return
 
         proc = await self.process_manager.spawn_app(
@@ -587,7 +590,7 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
     async def _action_processes(self, app_name) -> None:
         """Return detailed process tree for the app."""
         if not self.process_manager:
-            self.error("Process manager not available", 500)
+            self.error(ERROR_PROCESS_MANAGER_NOT_AVAILABLE, 500)
             return
 
         proc_status = self.process_manager.get_app_status(app_name)

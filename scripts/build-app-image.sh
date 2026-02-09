@@ -27,20 +27,20 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Validate app exists
 APP_DIR="$PROJECT_ROOT/apps/$APP_NAME"
-if [ ! -d "$APP_DIR" ]; then
+if [[ ! -d "$APP_DIR" ]]; then
     echo "ERROR: App directory not found: $APP_DIR"
     echo "Available apps:"
     ls -1 "$PROJECT_ROOT/apps/" 2>/dev/null | grep -v __pycache__ || echo "  (none)"
     exit 1
 fi
 
-if [ ! -f "$APP_DIR/requirements.txt" ]; then
+if [[ ! -f "$APP_DIR/requirements.txt" ]]; then
     echo "ERROR: $APP_NAME does not have a requirements.txt (not an isolated app)"
     exit 1
 fi
 
 # Build image name
-if [ -n "$REGISTRY" ]; then
+if [[ -n "$REGISTRY" ]]; then
     IMAGE_NAME="$REGISTRY/pyrest-$APP_NAME:$TAG"
 else
     IMAGE_NAME="pyrest-$APP_NAME:$TAG"
@@ -57,12 +57,12 @@ echo ""
 # Build args for PyPI proxy (if set in environment)
 BUILD_ARGS="--build-arg APP_NAME=$APP_NAME"
 
-if [ -n "${PIP_INDEX_URL:-}" ]; then
+if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     BUILD_ARGS="$BUILD_ARGS --build-arg PIP_INDEX_URL=$PIP_INDEX_URL"
     echo "Using PyPI index: $PIP_INDEX_URL"
 fi
 
-if [ -n "${PIP_TRUSTED_HOST:-}" ]; then
+if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
     BUILD_ARGS="$BUILD_ARGS --build-arg PIP_TRUSTED_HOST=$PIP_TRUSTED_HOST"
 fi
 

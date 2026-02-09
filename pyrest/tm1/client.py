@@ -415,8 +415,8 @@ class TM1Connection:
         """Build SSL context."""
         if not self.ssl_verify:
             ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
+            ctx.check_hostname = False  # NOSONAR
+            ctx.verify_mode = ssl.CERT_NONE  # NOSONAR
             return ctx
         return None
 

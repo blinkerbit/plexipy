@@ -23,6 +23,9 @@ from pyrest.validation import PYDANTIC_AVAILABLE, RequestModel, field
 # Import async TM1 operations
 from . import tm1_operations as tm1_ops
 
+DESC_CUBE_NAME = "Cube name"
+ERROR_TM1_NOT_AVAILABLE = "TM1 module not available"
+
 # =============================================================================
 # Request Models
 # =============================================================================
@@ -40,17 +43,17 @@ if PYDANTIC_AVAILABLE:
         ssl: bool = field(default=True, description="Use SSL")
 
     class FetchInput(ConnectionInput):
-        cube: str = field(description="Cube name")
+        cube: str = field(description=DESC_CUBE_NAME)
         element1: str = field(description="First element (comma-separated for multi-dim)")
         element2: str = field(description="Second element")
 
     class UpdateInput(ConnectionInput):
-        cube: str = field(description="Cube name")
+        cube: str = field(description=DESC_CUBE_NAME)
         target_element: str = field(description="Target element")
         value: float = field(description="Value to write")
 
     class CalculateInput(ConnectionInput):
-        cube: str = field(description="Cube name")
+        cube: str = field(description=DESC_CUBE_NAME)
         element1: str = field(description="First element")
         element2: str = field(description="Second element")
         target_element: str = field(description="Target element for sum")
@@ -131,24 +134,30 @@ class POVInfoHandler(SimpleHandler):
 
 class POVUIHandler(SimpleHandler):
     async def get(self):
+        import asyncio
+        from pathlib import Path
+
         app_path = os.environ.get("PYREST_APP_PATH", os.path.dirname(__file__))
-        html_path = os.path.join(app_path, "static", "index.html")
+        html_path = Path(app_path) / "static" / "index.html"
         try:
-            with open(html_path, encoding="utf-8") as f:
-                self.set_header("Content-Type", "text/html")
-                self.write(f.read())
+            content = await asyncio.to_thread(html_path.read_text, encoding="utf-8")
+            self.set_header("Content-Type", "text/html")
+            self.write(content)
         except FileNotFoundError:
             self.not_found("UI not found")
 
 
 class POVTokenUIHandler(SimpleHandler):
     async def get(self):
+        import asyncio
+        from pathlib import Path
+
         app_path = os.environ.get("PYREST_APP_PATH", os.path.dirname(__file__))
-        html_path = os.path.join(app_path, "static", "token.html")
+        html_path = Path(app_path) / "static" / "token.html"
         try:
-            with open(html_path, encoding="utf-8") as f:
-                self.set_header("Content-Type", "text/html")
-                self.write(f.read())
+            content = await asyncio.to_thread(html_path.read_text, encoding="utf-8")
+            self.set_header("Content-Type", "text/html")
+            self.write(content)
         except FileNotFoundError:
             self.not_found("Token UI not found")
 
@@ -156,7 +165,7 @@ class POVTokenUIHandler(SimpleHandler):
 class POVConnectHandler(SimpleHandler):
     async def post(self):
         if not tm1_ops.TM1_AVAILABLE:
-            return self.error("TM1 module not available", status=500)
+            return self.error(ERROR_TM1_NOT_AVAILABLE, status=500)
 
         data = self.get_data(model=ConnectionInput) if PYDANTIC_AVAILABLE else self.get_json_body()
         if data is None:
@@ -177,7 +186,7 @@ class POVConnectHandler(SimpleHandler):
 class POVFetchHandler(SimpleHandler):
     async def post(self):
         if not tm1_ops.TM1_AVAILABLE:
-            return self.error("TM1 module not available", status=500)
+            return self.error(ERROR_TM1_NOT_AVAILABLE, status=500)
 
         data = (
             self.get_data(model=FetchInput)
@@ -205,7 +214,7 @@ class POVFetchHandler(SimpleHandler):
 class POVUpdateHandler(SimpleHandler):
     async def post(self):
         if not tm1_ops.TM1_AVAILABLE:
-            return self.error("TM1 module not available", status=500)
+            return self.error(ERROR_TM1_NOT_AVAILABLE, status=500)
 
         data = (
             self.get_data(model=UpdateInput)
@@ -241,7 +250,7 @@ class POVUpdateHandler(SimpleHandler):
 class POVCalculateHandler(SimpleHandler):
     async def post(self):
         if not tm1_ops.TM1_AVAILABLE:
-            return self.error("TM1 module not available", status=500)
+            return self.error(ERROR_TM1_NOT_AVAILABLE, status=500)
 
         data = (
             self.get_data(model=CalculateInput)

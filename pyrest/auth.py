@@ -23,6 +23,9 @@ from .config import get_config, get_env
 
 logger = logging.getLogger("pyrest.auth")
 
+ERROR_INSUFFICIENT_PERMISSIONS = "Insufficient permissions"
+
+
 
 class AuthConfig:
     """
@@ -562,7 +565,7 @@ def require_roles(allowed_roles: list[str]) -> Callable:
             user_roles = user.get("roles", [])
             if not any(role in user_roles for role in allowed_roles):
                 self.set_status(403)
-                self.write({"error": "Insufficient permissions"})
+                self.write({"error": ERROR_INSUFFICIENT_PERMISSIONS})
                 return None
 
             return await method(self, *args, **kwargs)
@@ -669,7 +672,7 @@ def require_azure_roles(allowed_roles: list[str]) -> Callable:
             # Check if user has any of the allowed roles
             if not any(role in azure_roles for role in allowed_roles):
                 self.set_status(403)
-                self.write({"error": "Insufficient permissions"})
+                self.write({"error": ERROR_INSUFFICIENT_PERMISSIONS})
                 return None
 
             return await method(self, *args, **kwargs)
@@ -745,7 +748,7 @@ def azure_ad_protected(allowed_roles: list[str] | None = None) -> Callable:
             # Check roles if specified
             if allowed_roles and not any(role in roles for role in allowed_roles):
                 self.set_status(403)
-                self.write({"error": "Insufficient permissions"})
+                self.write({"error": ERROR_INSUFFICIENT_PERMISSIONS})
                 return None
 
             return await method(self, *args, **kwargs)
