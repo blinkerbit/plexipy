@@ -59,7 +59,7 @@ RUN apk add --no-cache --virtual .build-deps \
 COPY --chown=root:root --chmod=755 pyrest/ ./pyrest/
 COPY --chown=root:root --chmod=755 apps/ ./apps/
 COPY --chown=root:root --chmod=755 scripts/ ./scripts/
-COPY --chown=root:root --chmod=755 main.py .
+COPY --chown=root:root --chmod=755 main.py . 
 COPY --chown=root:root --chmod=755 setup_pip.sh .
 COPY --chown=root:root --chmod=644 config.json auth_config.json pyproject.toml ./
 
