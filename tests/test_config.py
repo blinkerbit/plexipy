@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from pyrest.config import EnvConfig, FrameworkConfig
+from tests.conftest import TEST_JWT_SECRET
 
 
 class TestEnvConfig:
@@ -129,7 +130,7 @@ class TestFrameworkConfig:
         assert config.get("nonexistent", "default") == "default"
 
     def test_jwt_secret_from_env(self, temp_dir: Path, mock_env_vars):
-        """Should prefer JWT_SECRET from environment."""
+        """Should prefer PYREST_JWT_SECRET from environment."""
         os.chdir(temp_dir)
 
         # Clear singleton
@@ -141,7 +142,7 @@ class TestFrameworkConfig:
 
         config = FrameworkConfig("nonexistent.json")
 
-        assert config.jwt_secret == "test-jwt-secret"
+        assert config.jwt_secret == TEST_JWT_SECRET
 
     def test_save_config(self, temp_dir: Path):
         """Should save configuration to file."""

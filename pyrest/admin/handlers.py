@@ -369,8 +369,9 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
       - venv-status:   Return venv info (exists, valid, size)
     """
 
+    @authenticated
     async def post(self, app_name: str, action: str):
-        """Control an isolated app."""
+        """Control an isolated app (requires authentication)."""
         if not self.app_loader:
             self.error("App loader not available", 500)
             return

@@ -144,7 +144,7 @@ class AuthConfig:
         auth_config_path = os.environ.get("PYREST_AUTH_CONFIG", "auth_config.json")
 
         default_config = {
-            "jwt_secret": os.environ.get("PYREST_JWT_SECRET", "change-this-secret"),
+            "jwt_secret": os.environ.get("PYREST_JWT_SECRET", ""),
             "jwt_algorithm": "HS256",
         }
 
@@ -154,7 +154,7 @@ class AuthConfig:
                 with config_path.open() as f:
                     file_config = json.load(f)
                     default_config.update(file_config)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Could not load auth config: {e}")
 
         self._config = default_config
@@ -237,9 +237,6 @@ def load_app_handlers(app_path: Path) -> list[tuple]:
 
     except Exception as e:
         logger.exception(f"Error loading handlers: {e}")
-        import traceback
-
-        traceback.print_exc()
         return []
 
 

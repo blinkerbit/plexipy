@@ -284,6 +284,9 @@ def validate(model_class: type[RequestModel]):
     """
 
     def decorator(func):
+        import functools
+
+        @functools.wraps(func)
         async def wrapper(self, *args, **kwargs):
             body = self.get_json_body() if hasattr(self, "get_json_body") else {}
             data, error = model_class.validate_request(body)

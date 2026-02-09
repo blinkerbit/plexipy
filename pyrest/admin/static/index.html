@@ -604,11 +604,11 @@
         // =====================================================================
         // Render helpers
         // =====================================================================
-        function renderProcessInfo(proc) {
+        function renderProcessInfo(proc, name) {
             if (!proc || !proc.running) {
                 return '<span class="proc-info">not running</span>';
             }
-            var html = '<div class="proc-info">';
+            var html = '<div class="proc-info" style="cursor:pointer;" onclick="refreshProcesses(\'' + name + '\')" title="Click to refresh">';
             html += 'PID <span class="pid">' + proc.pid + '</span>';
             var total = proc.total_processes || 1;
             var children = proc.child_pids || [];
@@ -621,9 +621,9 @@
             return html;
         }
 
-        function renderVenvInfo(venv) {
+        function renderVenvInfo(venv, name) {
             if (!venv) return '<span class="venv-info venv-missing">-</span>';
-            var html = '<div class="venv-info">';
+            var html = '<div class="venv-info" style="cursor:pointer;" onclick="refreshVenvStatus(\'' + name + '\')" title="Click to refresh">';
             if (!venv.exists) {
                 html += '<span class="venv-missing">no .venv</span>';
             } else if (!venv.valid) {
@@ -639,21 +639,25 @@
         }
 
         function renderIsolatedActions(name, isRunning, venv) {
-            var html = '<div class="actions">';
-            if (isRunning) {
-                html += '<button class="action-btn danger" onclick="controlApp(\'' + name + '\', \'stop\')">Stop</button>';
-                html += '<button class="action-btn" onclick="controlApp(\'' + name + '\', \'restart\')">Restart</button>';
-            } else {
-                html += '<button class="action-btn success" onclick="controlApp(\'' + name + '\', \'start\')">Start</button>';
-            }
-
-            // Venv lifecycle controls
             var venvExists = venv && venv.exists;
-            if (venvExists) {
-                html += '<button class="action-btn danger" onclick="confirmDeleteVenv(\'' + name + '\')">Delete .venv</button>';
-            } else {
-                html += '<button class="action-btn success" onclick="confirmCreateVenv(\'' + name + '\')">Create .venv</button>';
-            }
+            var venvValid = venv && venv.valid;
+
+            // Row 1: App lifecycle
+            var html = '<div class="actions" style="margin-bottom:0.3rem;">';
+            html += '<button class="action-btn success" onclick="controlApp(\'' + name + '\', \'start\')"' +
+                (isRunning ? ' disabled title="Already running"' : '') + '>Start</button>';
+            html += '<button class="action-btn danger" onclick="controlApp(\'' + name + '\', \'stop\')"' +
+                (!isRunning ? ' disabled title="Not running"' : '') + '>Stop</button>';
+            html += '<button class="action-btn" onclick="controlApp(\'' + name + '\', \'restart\')"' +
+                (!isRunning ? ' disabled title="Not running"' : '') + '>Restart</button>';
+            html += '</div>';
+
+            // Row 2: Venv lifecycle
+            html += '<div class="actions">';
+            html += '<button class="action-btn success" onclick="confirmCreateVenv(\'' + name + '\')"' +
+                (venvExists ? ' disabled title=".venv already exists"' : '') + '>Create .venv</button>';
+            html += '<button class="action-btn danger" onclick="confirmDeleteVenv(\'' + name + '\')"' +
+                (!venvExists ? ' disabled title="No .venv to delete"' : '') + '>Delete .venv</button>';
             html += '<button class="action-btn primary" onclick="confirmRebuild(\'' + name + '\')">Rebuild .venv</button>';
             html += '</div>';
             return html;
@@ -713,8 +717,8 @@
                     '<td><strong>' + app.name + '</strong>' +
                         '<br><span style="color:var(--fg-dim);font-size:0.7rem;">' + app.prefix + ' :' + app.port + '</span></td>' +
                     '<td><span class="badge isolated">isolated</span></td>' +
-                    '<td>' + statusBadge + renderProcessInfo(proc) + '</td>' +
-                    '<td>' + renderVenvInfo(app.venv) + '</td>' +
+                    '<td>' + statusBadge + renderProcessInfo(proc, app.name) + '</td>' +
+                    '<td>' + renderVenvInfo(app.venv, app.name) + '</td>' +
                     '<td id="' + healthId + '">' + healthBadge(null) + '</td>' +
                     '<td>' + renderIsolatedActions(app.name, isRunning, app.venv) + '</td>' +
                     '</tr>');
@@ -806,8 +810,16 @@
             showToast(action + ' ' + name + '...', '');
 
             fetch(API_BASE + '/apps/' + name + '/' + action, { method: 'POST' })
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    if (r.status === 401 || r.status === 403) {
+                        showToast('Authorization required. Please log in first.', 'error');
+                        addLog('error', name + ' ' + action + ': not authorized (HTTP ' + r.status + ')');
+                        return null;
+                    }
+                    return r.json();
+                })
                 .then(function(data) {
+                    if (!data) return; // auth error already handled
                     if (data.success) {
                         var msg = data.message || (action + ' successful');
                         showToast(msg, 'success');
@@ -836,6 +848,53 @@
                     showToast('Error: ' + e.message, 'error');
                     addLog('error', 'Request failed: ' + e.message);
                 });
+        }
+
+        function handleAuthError(r) {
+            if (r.status === 401 || r.status === 403) {
+                showToast('Authorization required. Please log in first.', 'error');
+                addLog('error', 'Not authorized (HTTP ' + r.status + ')');
+                return true;
+            }
+            return false;
+        }
+
+        function refreshProcesses(name) {
+            fetch(API_BASE + '/apps/' + name + '/processes', { method: 'POST' })
+                .then(function(r) { if (handleAuthError(r)) return null; return r.json(); })
+                .then(function(data) {
+                    if (!data) return;
+                    if (data.success) {
+                        var d = data.data;
+                        var msg = d.running
+                            ? 'PID ' + d.pid + ', ' + d.total_processes + ' total (' + (d.child_pids || []).length + ' workers)'
+                            : 'not running';
+                        addLog('info', name + ' processes: ' + msg);
+                        showToast(name + ': ' + msg, 'success');
+                        setTimeout(loadStatus, 500);
+                    } else {
+                        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+                    }
+                })
+                .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+        }
+
+        function refreshVenvStatus(name) {
+            fetch(API_BASE + '/apps/' + name + '/venv-status', { method: 'POST' })
+                .then(function(r) { if (handleAuthError(r)) return null; return r.json(); })
+                .then(function(data) {
+                    if (!data) return;
+                    if (data.success) {
+                        addLog('info', name + ': venv ' + (data.data.exists ? (data.data.valid ? 'ready' : 'invalid') : 'missing') +
+                            (data.data.size_mb ? ' (' + data.data.size_mb + ' MB)' : ''));
+                        showToast(name + ' venv: ' + (data.data.exists ? (data.data.valid ? 'ready' : 'invalid') : 'missing'), 'success');
+                        // Refresh full status to update the row
+                        setTimeout(loadStatus, 500);
+                    } else {
+                        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+                    }
+                })
+                .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
         }
 
         function confirmDeleteVenv(name) {

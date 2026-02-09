@@ -120,7 +120,9 @@ class AppConfigParser:
                 prefixed_key = f"{self.app_name}.tm1.{instance_name}.{param}"
                 os.environ[prefixed_key] = str_value
                 self._os_vars[prefixed_key] = str_value
-                logger.debug(f"Set instance env var: {prefixed_key}={str_value}")
+                _sensitive = {"password", "client_secret", "api_key", "secret", "token"}
+                safe_value = "****" if param.lower() in _sensitive else str_value
+                logger.debug("Set instance env var: %s=%s", prefixed_key, safe_value)
 
                 # For isolated apps, also set in TM1_<INSTANCE>_<PARAM> format
                 if self.is_isolated:
@@ -360,8 +362,8 @@ class EnvConfig:
                         value = value.strip().strip('"').strip("'")
                         os.environ[key] = value
                         self._custom_vars[key] = value
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning("Could not read env file %s: %s", env_file, e)
         self._env_file_loaded = True
 
     def get(self, key: str, default: str | None = None) -> str | None:
@@ -408,7 +410,7 @@ class FrameworkConfig:
             "apps_folder": "apps",
             "env_file": ".env",
             "auth_config_file": "auth_config.json",
-            "jwt_secret": os.environ.get("PYREST_JWT_SECRET", "change-this-secret-in-production"),
+            "jwt_secret": os.environ.get("PYREST_JWT_SECRET", ""),
             "jwt_expiry_hours": 24,
             "cors_enabled": True,
             "cors_origins": ["*"],

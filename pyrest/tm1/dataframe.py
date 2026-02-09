@@ -267,7 +267,6 @@ def _build_df_two_axes(col_axis: dict, row_axis: dict, cells: list[dict], value_
         return pl.DataFrame()
 
     n_cols = len(col_tuples)
-    len(row_tuples)
 
     # Get row dimension names
     first_row_tuple = row_tuples[0]

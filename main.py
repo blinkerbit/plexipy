@@ -35,6 +35,7 @@ Examples:
   python main.py                     Start server with default config
   python main.py --port 8080         Start on port 8080
   python main.py --debug             Enable debug mode
+  python main.py --app pov --debug   Run only the 'pov' app (dev mode)
   python main.py --no-isolated       Don't setup isolated apps
 
 App Types:
@@ -81,6 +82,12 @@ URL Structure:
         default="config.json",
         help="Path to configuration file (default: config.json)",
     )
+    parser.add_argument(
+        "--app",
+        type=str,
+        default=None,
+        help="Run only a single app by name (e.g. --app pov). Great for development.",
+    )
 
     args = parser.parse_args()
 
@@ -107,6 +114,7 @@ URL Structure:
         debug=args.debug,
         setup_isolated=not args.no_isolated,
         generate_nginx=not args.no_nginx,
+        app_filter=args.app,
     )
 
 

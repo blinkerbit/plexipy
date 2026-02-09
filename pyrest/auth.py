@@ -5,11 +5,12 @@ Supports JWT tokens and Microsoft Azure AD authentication.
 
 import functools
 import hashlib
+import hmac
 import json
 import logging
-import time
+import secrets
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -144,7 +145,7 @@ class JWTAuth:
 
     def generate_token(self, payload: dict[str, Any]) -> str:
         """Generate a JWT token with the given payload."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         token_payload = {
             **payload,
             "iat": now,
@@ -215,8 +216,8 @@ class AzureADAuth:
             "redirect_uri": self.redirect_uri,
             "scope": " ".join(self.scopes),
             "response_mode": "query",
-            "state": state or str(time.time()),
-            "nonce": nonce or str(time.time()),
+            "state": state or secrets.token_urlsafe(32),
+            "nonce": nonce or secrets.token_urlsafe(32),
         }
         return f"{self.authorize_endpoint}?{urlencode(params)}"
 
@@ -404,17 +405,38 @@ class AuthManager:
         if username in self._user_store:
             raise AuthError("User already exists")
 
-        # In production, use proper password hashing (bcrypt, argon2)
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        password_hash = self._hash_password(password)
 
         user = {
             "username": username,
             "password_hash": password_hash,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             **extra,
         }
         self._user_store[username] = user
         return {"username": username, **extra}
+
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        """Hash a password using salted HMAC-SHA256.
+
+        For production deployments requiring offline brute-force resistance,
+        consider upgrading to bcrypt or argon2 (requires additional dependency).
+        """
+        salt = secrets.token_hex(16)
+        digest = hmac.new(salt.encode(), password.encode(), hashlib.sha256).hexdigest()
+        return f"{salt}${digest}"
+
+    @staticmethod
+    def _verify_password(password: str, stored_hash: str) -> bool:
+        """Verify a password against a stored salted HMAC-SHA256 hash."""
+        if "$" not in stored_hash:
+            # Legacy unsalted SHA-256 hash — compare with constant-time comparison
+            legacy_hash = hashlib.sha256(password.encode()).hexdigest()
+            return hmac.compare_digest(legacy_hash, stored_hash)
+        salt, digest = stored_hash.split("$", 1)
+        candidate = hmac.new(salt.encode(), password.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(candidate, digest)
 
     def authenticate_user(self, username: str, password: str) -> str | None:
         """Authenticate a user and return a JWT token."""
@@ -422,8 +444,7 @@ class AuthManager:
         if not user:
             return None
 
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
-        if user["password_hash"] != password_hash:
+        if not self._verify_password(password, user["password_hash"]):
             return None
 
         return self.jwt_auth.generate_token({"sub": username, "type": "jwt"})
@@ -527,13 +548,7 @@ def require_roles(allowed_roles: list[str]) -> Callable:
             user_roles = user.get("roles", [])
             if not any(role in user_roles for role in allowed_roles):
                 self.set_status(403)
-                self.write(
-                    {
-                        "error": "Insufficient permissions",
-                        "required_roles": allowed_roles,
-                        "user_roles": user_roles,
-                    }
-                )
+                self.write({"error": "Insufficient permissions"})
                 return None
 
             return await method(self, *args, **kwargs)
@@ -590,9 +605,10 @@ def azure_ad_authenticated(method: Callable) -> Callable:
             self.set_status(401)
             self.write({"error": str(e)})
             return None
-        except Exception as e:
+        except (jwt.InvalidTokenError, KeyError, ValueError) as e:
             self.set_status(401)
-            self.write({"error": f"Token validation failed: {e!s}"})
+            self.write({"error": "Token validation failed"})
+            logger.debug("Azure AD token validation failed: %s", e)
             return None
 
         return await method(self, *args, **kwargs)
@@ -630,7 +646,6 @@ def require_azure_roles(allowed_roles: list[str]) -> Callable:
         async def wrapper(self, *args, **kwargs):
             # Check if azure_ad_authenticated was applied
             azure_roles = getattr(self, "_azure_roles", None)
-            user = getattr(self, "_current_user", None)
 
             if azure_roles is None:
                 self.set_status(401)
@@ -640,15 +655,7 @@ def require_azure_roles(allowed_roles: list[str]) -> Callable:
             # Check if user has any of the allowed roles
             if not any(role in azure_roles for role in allowed_roles):
                 self.set_status(403)
-                self.write(
-                    {
-                        "error": "Insufficient permissions",
-                        "message": f"This endpoint requires one of the following roles: {', '.join(allowed_roles)}",
-                        "required_roles": allowed_roles,
-                        "user_roles": azure_roles,
-                        "user": user.get("email") if user else None,
-                    }
-                )
+                self.write({"error": "Insufficient permissions"})
                 return None
 
             return await method(self, *args, **kwargs)
@@ -715,23 +722,16 @@ def azure_ad_protected(allowed_roles: list[str] | None = None) -> Callable:
                 self.set_status(401)
                 self.write({"error": str(e)})
                 return None
-            except Exception as e:
+            except (jwt.InvalidTokenError, KeyError, ValueError) as e:
                 self.set_status(401)
-                self.write({"error": f"Token validation failed: {e!s}"})
+                self.write({"error": "Token validation failed"})
+                logger.debug("Azure AD protected token validation failed: %s", e)
                 return None
 
             # Check roles if specified
             if allowed_roles and not any(role in roles for role in allowed_roles):
                 self.set_status(403)
-                self.write(
-                    {
-                        "error": "Insufficient permissions",
-                        "message": f"This endpoint requires one of the following roles: {', '.join(allowed_roles)}",
-                        "required_roles": allowed_roles,
-                        "user_roles": roles,
-                        "user": user_info.get("email"),
-                    }
-                )
+                self.write({"error": "Insufficient permissions"})
                 return None
 
             return await method(self, *args, **kwargs)

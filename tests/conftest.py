@@ -16,6 +16,9 @@ import pytest
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Minimum 32-byte secret for HMAC-SHA256 — shared across all test modules
+TEST_JWT_SECRET = "pyrest-test-jwt-secret-key-32b!!"  # 32 bytes
+
 
 @pytest.fixture
 def temp_dir() -> Generator[Path]:
@@ -36,7 +39,7 @@ def sample_config() -> dict[str, Any]:
         "apps_folder": "apps",
         "env_file": ".env",
         "auth_config_file": "auth_config.json",
-        "jwt_secret": "test-secret-key-for-testing",
+        "jwt_secret": TEST_JWT_SECRET,
         "jwt_expiry_hours": 24,
         "cors_enabled": True,
         "cors_origins": ["*"],
@@ -54,7 +57,7 @@ def sample_auth_config() -> dict[str, Any]:
         "client_secret": "test-client-secret",
         "redirect_uri": "http://localhost:8000/pyrest/auth/azure/callback",
         "scopes": ["openid", "profile", "email"],
-        "jwt_secret": "test-jwt-secret",
+        "jwt_secret": TEST_JWT_SECRET,
         "jwt_expiry_hours": 24,
         "jwt_algorithm": "HS256",
     }
@@ -172,7 +175,7 @@ def mock_env_vars():
     os.environ["AZURE_AD_TENANT_ID"] = "test-tenant"
     os.environ["AZURE_AD_CLIENT_ID"] = "test-client"
     os.environ["AZURE_AD_CLIENT_SECRET"] = "test-secret"
-    os.environ["JWT_SECRET"] = "test-jwt-secret"
+    os.environ["PYREST_JWT_SECRET"] = TEST_JWT_SECRET
 
     yield
 

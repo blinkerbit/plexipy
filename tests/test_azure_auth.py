@@ -22,6 +22,7 @@ from pyrest.auth import (
     require_azure_roles,
     require_roles,
 )
+from tests.conftest import TEST_JWT_SECRET
 
 
 class TestAzureADAuthTokenMethods:
@@ -35,7 +36,7 @@ class TestAzureADAuthTokenMethods:
         with patch("pyrest.auth.get_auth_config") as mock:
             mock.return_value.tenant_id = "test-tenant"
             mock.return_value.client_id = "test-client"
-            mock.return_value.client_secret = "test-secret"
+            mock.return_value.client_secret = TEST_JWT_SECRET
             mock.return_value.redirect_uri = "http://localhost/callback"
             mock.return_value.scopes = ["openid", "profile"]
             mock.return_value.is_configured = True
@@ -60,7 +61,7 @@ class TestAzureADAuthTokenMethods:
             "iat": datetime.utcnow(),
             "exp": datetime.utcnow() + timedelta(hours=1),
         }
-        return jwt.encode(payload, "secret", algorithm="HS256")
+        return jwt.encode(payload, TEST_JWT_SECRET, algorithm="HS256")
 
     def test_decode_token_claims(self, azure_auth, sample_token):
         """Should decode token claims without validation."""
@@ -90,7 +91,7 @@ class TestAzureADAuthTokenMethods:
         """Should return empty list when no roles."""
         token_without_roles = jwt.encode(
             {"sub": "user", "exp": datetime.utcnow() + timedelta(hours=1)},
-            "secret",
+            TEST_JWT_SECRET,
             algorithm="HS256",
         )
 
@@ -141,7 +142,7 @@ class TestAzureADAuthenticatedDecorator:
             "roles": ["Admin", "Reader"],
             "exp": datetime.utcnow() + timedelta(hours=1),
         }
-        return jwt.encode(payload, "secret", algorithm="HS256")
+        return jwt.encode(payload, TEST_JWT_SECRET, algorithm="HS256")
 
     @pytest.mark.asyncio
     async def test_valid_token(self, mock_handler, valid_token):
@@ -289,7 +290,7 @@ class TestAzureADProtectedDecorator:
             "roles": ["Admin", "Reader"],
             "exp": datetime.utcnow() + timedelta(hours=1),
         }
-        return jwt.encode(payload, "secret", algorithm="HS256")
+        return jwt.encode(payload, TEST_JWT_SECRET, algorithm="HS256")
 
     @pytest.mark.asyncio
     async def test_auth_only_no_roles(self, valid_token):
@@ -417,6 +418,7 @@ class TestRequireRolesWithListParam:
 
         await test_method(mock_handler)
 
-        assert "required_roles" in written_data
-        assert written_data["required_roles"] == ["admin", "superuser"]
-        assert written_data["user_roles"] == ["viewer"]
+        # S5131: 403 responses should not expose role details
+        assert written_data == {"error": "Insufficient permissions"}
+        assert "required_roles" not in written_data
+        assert "user_roles" not in written_data

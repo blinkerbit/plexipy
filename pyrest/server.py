@@ -3,6 +3,8 @@ Main server module for PyRest framework.
 """
 
 import logging
+import os
+import secrets
 from pathlib import Path
 
 import tornado.httpserver
@@ -154,7 +156,12 @@ class PyRestApplication(tornado.web.Application):
     Main PyRest application class.
     """
 
-    def __init__(self, extra_handlers: list | None = None, **settings):
+    def __init__(
+        self,
+        extra_handlers: list | None = None,
+        app_filter: str | None = None,
+        **settings,
+    ):
         self.framework_config = get_config()
         self.env = get_env()
         self.app_loader = AppLoader()
@@ -162,8 +169,8 @@ class PyRestApplication(tornado.web.Application):
         self.process_manager = get_process_manager()
         self.nginx_generator = get_nginx_generator()
 
-        # Load and discover all apps
-        app_handlers = self.app_loader.load_all_apps()
+        # Load and discover apps (optionally filtered to a single app)
+        app_handlers = self.app_loader.load_all_apps(app_filter=app_filter)
 
         # Combine all handlers with /pyrest base path
         # Use /? pattern for optional trailing slash support
@@ -195,7 +202,7 @@ class PyRestApplication(tornado.web.Application):
         # Application settings
         app_settings = {
             "debug": self.framework_config.debug,
-            "cookie_secret": self.framework_config.jwt_secret,
+            "cookie_secret": os.environ.get("PYREST_COOKIE_SECRET", secrets.token_hex(32)),
             "xsrf_cookies": False,  # Disabled for API usage
             **settings,
         }
@@ -221,8 +228,6 @@ class PyRestApplication(tornado.web.Application):
         super().__init__(handlers, **app_settings)
 
         # Log loaded apps
-        len(self.app_loader.loaded_apps)
-        len(self.app_loader.isolated_apps)
         logger.info(f"PyRest application initialized with {len(handlers)} handlers")
         logger.info(f"Embedded apps: {list(self.app_loader.loaded_apps.keys())}")
         logger.info(f"Isolated apps: {list(self.app_loader.isolated_apps.keys())}")
@@ -317,9 +322,6 @@ class PyRestApplication(tornado.web.Application):
                 except Exception as e:
                     error_msg = f"Error spawning process: {e}"
                     logger.exception(f"Error spawning isolated app {app_config.name}: {e}")
-                    import traceback
-
-                    logger.debug(traceback.format_exc())
                     self.app_loader.failed_apps[app_config.name] = {
                         "name": app_config.name,
                         "path": str(app_config.path),
@@ -333,9 +335,6 @@ class PyRestApplication(tornado.web.Application):
             except Exception as e:
                 error_msg = f"Unexpected error during setup: {e}"
                 logger.exception(f"Unexpected error setting up {app_config.name}: {e}")
-                import traceback
-
-                logger.debug(traceback.format_exc())
                 self.app_loader.failed_apps[app_config.name] = {
                     "name": app_config.name,
                     "path": str(app_config.path),
@@ -370,15 +369,12 @@ class PyRestApplication(tornado.web.Application):
             )
         except Exception as e:
             logger.exception(f"Failed to generate nginx configuration: {e}")
-            import traceback
-
-            logger.debug(traceback.format_exc())
             return None
 
 
-def create_app(**settings) -> PyRestApplication:
+def create_app(app_filter: str | None = None, **settings) -> PyRestApplication:
     """Create and return a PyRest application instance."""
-    return PyRestApplication(**settings)
+    return PyRestApplication(app_filter=app_filter, **settings)
 
 
 def run_server(
@@ -387,6 +383,7 @@ def run_server(
     debug: bool | None = None,
     setup_isolated: bool = True,
     generate_nginx: bool = True,
+    app_filter: str | None = None,
 ) -> None:
     """
     Run the PyRest server.
@@ -404,7 +401,10 @@ def run_server(
         config.set("debug", True)
         logging.getLogger().setLevel(logging.DEBUG)
 
-    app = create_app()
+    if app_filter:
+        logger.info(f"Single-app mode: only loading '{app_filter}'")
+
+    app = create_app(app_filter=app_filter)
     io_loop = tornado.ioloop.IOLoop.current()
 
     # Run async setup tasks before the loop starts

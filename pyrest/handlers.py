@@ -3,12 +3,15 @@ Base handlers and authentication endpoints for PyRest framework.
 """
 
 import json
+import logging
 from typing import Any
 
 import tornado.web
 
 from .auth import AuthError, authenticated, get_auth_manager
 from .config import get_config, get_env
+
+logger = logging.getLogger("pyrest.handlers")
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -113,7 +116,9 @@ class BaseHandler(tornado.web.RequestHandler):
             if isinstance(exc, tornado.web.HTTPError):
                 error_message = exc.log_message or str(exc)
             else:
-                error_message = str(exc)
+                # S5131: Never expose internal exception details to clients
+                logger.exception("Unhandled exception", exc_info=kwargs["exc_info"])
+                error_message = "Internal server error"
 
         self.write({"error": True, "status_code": status_code, "message": error_message})
 
@@ -292,8 +297,10 @@ class AzureADLogoutHandler(BaseHandler):
             self.error("Azure AD authentication is not configured", 500)
             return
 
-        # Azure AD logout URL
+        # Azure AD logout URL — validate redirect_uri to prevent open redirects (S5146)
         post_logout_redirect = self.get_argument("redirect_uri", "/")
+        if not post_logout_redirect.startswith("/"):
+            post_logout_redirect = "/"
         logout_url = (
             f"{auth_manager.azure_auth.authority}/oauth2/v2.0/logout"
             f"?post_logout_redirect_uri={post_logout_redirect}"

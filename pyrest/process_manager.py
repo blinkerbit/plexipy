@@ -271,11 +271,13 @@ class ProcessManager:
 
             # Popen is appropriate for long-running background processes.
             # start_new_session=True so we can killpg the whole group later.
+            # Use DEVNULL for stdout/stderr to avoid PIPE buffer deadlocks on
+            # long-lived daemon processes (app logs go to their own log files).
             process = subprocess.Popen(
                 [str(python_exe), str(runner_script)],
                 cwd=str(app_path),
                 env=env,
-                stdout=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 start_new_session=True,
             )
@@ -284,13 +286,18 @@ class ProcessManager:
             await asyncio.sleep(0.5)
 
             if process.poll() is not None:
-                _stdout, stderr = process.communicate()
+                stderr = process.stderr.read() if process.stderr else b""
+                process.stderr.close()
                 logger.error(
                     f"App {app_name} failed to start. "
                     f"Exit code: {process.returncode}. "
                     f"Stderr: {stderr.decode(errors='replace') if stderr else 'N/A'}"
                 )
                 return None
+
+            # Close stderr PIPE after successful startup — the app logs to its own files
+            if process.stderr:
+                process.stderr.close()
 
             app_process = AppProcess(
                 name=app_name,
@@ -398,7 +405,8 @@ class ProcessManager:
                     app_process.process.terminate()
                 try:
                     app_process.process.wait(timeout=3)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Timeout waiting for %s, force killing: %s", app_name, e)
                     app_process.process.kill()
         self._processes.clear()
 

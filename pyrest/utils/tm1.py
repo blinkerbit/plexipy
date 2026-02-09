@@ -595,9 +595,6 @@ class TM1ConnectionManager:
 
         except Exception as e:
             log.exception(f"TM1 connection error for instance '{name}': {e}")
-            import traceback
-
-            log.debug(traceback.format_exc())
             cls._connections[name] = None
             return None
 

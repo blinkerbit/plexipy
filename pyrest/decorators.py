@@ -11,9 +11,6 @@ from .auth import authenticated as auth_decorator
 from .auth import require_roles
 from .handlers import BaseHandler
 
-# Registry to store route information
-_route_registry: dict[str, list[dict[str, Any]]] = {}
-
 
 def route(path: str):
     """

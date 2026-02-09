@@ -3,6 +3,7 @@ Integration tests for the PyRest framework.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -14,6 +15,7 @@ import tornado.web
 
 from pyrest.handlers import BASE_PATH
 from pyrest.server import create_app
+from tests.conftest import TEST_JWT_SECRET
 
 
 class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
@@ -24,7 +26,7 @@ class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
         with patch("pyrest.server.get_config") as mock_config:
             mock_config.return_value.debug = True
             mock_config.return_value.apps_folder = "test_apps"
-            mock_config.return_value.jwt_secret = "test-secret"
+            mock_config.return_value.jwt_secret = TEST_JWT_SECRET
             mock_config.return_value.isolated_app_base_port = 9001
             mock_config.return_value.port = 8000
             mock_config.return_value.base_path = "/pyrest"
@@ -113,12 +115,29 @@ class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
 class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
     """Integration tests for authentication endpoints."""
 
+    def setUp(self):
+        self._orig_jwt = os.environ.get("PYREST_JWT_SECRET")
+        os.environ["PYREST_JWT_SECRET"] = TEST_JWT_SECRET
+        import pyrest.auth as _auth_mod
+
+        _auth_mod._auth_manager = None
+        if hasattr(_auth_mod, "AuthConfig"):
+            _auth_mod.AuthConfig._instance = None
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        if self._orig_jwt is not None:
+            os.environ["PYREST_JWT_SECRET"] = self._orig_jwt
+        else:
+            os.environ.pop("PYREST_JWT_SECRET", None)
+
     def get_app(self):
         """Create test application."""
         with patch("pyrest.server.get_config") as mock_config:
             mock_config.return_value.debug = True
             mock_config.return_value.apps_folder = "test_apps"
-            mock_config.return_value.jwt_secret = "test-secret"
+            mock_config.return_value.jwt_secret = TEST_JWT_SECRET
             mock_config.return_value.isolated_app_base_port = 9001
             mock_config.return_value.port = 8000
             mock_config.return_value.base_path = "/pyrest"
@@ -134,7 +153,7 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
                     mock_loader.return_value.get_isolated_apps.return_value = []
 
                     with patch("pyrest.auth.get_auth_config") as mock_auth:
-                        mock_auth.return_value.jwt_secret = "test-secret"
+                        mock_auth.return_value.jwt_secret = TEST_JWT_SECRET
                         mock_auth.return_value.jwt_expiry_hours = 24
                         mock_auth.return_value.jwt_algorithm = "HS256"
                         mock_auth.return_value.tenant_id = ""
@@ -200,12 +219,31 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
 class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
     """End-to-end workflow tests."""
 
+    def setUp(self):
+        # Ensure JWT secret is set for the full test lifecycle (not just get_app)
+        self._orig_jwt = os.environ.get("PYREST_JWT_SECRET")
+        os.environ["PYREST_JWT_SECRET"] = TEST_JWT_SECRET
+        # Reset auth singletons so they pick up the env var
+        import pyrest.auth as _auth_mod
+
+        _auth_mod._auth_manager = None
+        if hasattr(_auth_mod, "AuthConfig"):
+            _auth_mod.AuthConfig._instance = None
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        if self._orig_jwt is not None:
+            os.environ["PYREST_JWT_SECRET"] = self._orig_jwt
+        else:
+            os.environ.pop("PYREST_JWT_SECRET", None)
+
     def get_app(self):
         """Create test application."""
         with patch("pyrest.server.get_config") as mock_config:
             mock_config.return_value.debug = True
             mock_config.return_value.apps_folder = "test_apps"
-            mock_config.return_value.jwt_secret = "test-secret"
+            mock_config.return_value.jwt_secret = TEST_JWT_SECRET
             mock_config.return_value.isolated_app_base_port = 9001
             mock_config.return_value.port = 8000
             mock_config.return_value.base_path = "/pyrest"
@@ -221,7 +259,7 @@ class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
                     mock_loader.return_value.get_isolated_apps.return_value = []
 
                     with patch("pyrest.auth.get_auth_config") as mock_auth:
-                        mock_auth.return_value.jwt_secret = "test-secret"
+                        mock_auth.return_value.jwt_secret = TEST_JWT_SECRET
                         mock_auth.return_value.jwt_expiry_hours = 24
                         mock_auth.return_value.jwt_algorithm = "HS256"
                         mock_auth.return_value.is_configured = False

@@ -37,6 +37,34 @@ echo "║                                                           ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo ""
 
+# =============================================================================
+# Clean up stale .venv directories from previous runs
+# Uses a subshell to avoid set -e killing the script on permission errors
+# (common with Windows bind mounts where file ownership differs)
+# =============================================================================
+if [[ "${PYREST_CLEAN_VENVS:-true}" == "true" && -d "$APPS_FOLDER" ]]; then
+    (
+        set +e  # disable errexit inside subshell
+        cleaned=0
+        for venv_dir in "$APPS_FOLDER"/*/.venv; do
+            [ -d "$venv_dir" ] || continue
+            echo "Cleaning stale venv: $venv_dir"
+            rm -rf "$venv_dir" 2>/dev/null
+            if [ -d "$venv_dir" ]; then
+                chmod -R u+rwX "$venv_dir" 2>/dev/null
+                rm -rf "$venv_dir" 2>/dev/null
+            fi
+            if [ -d "$venv_dir" ]; then
+                echo "WARNING: Could not fully remove $venv_dir (permission denied)" >&2
+            else
+                cleaned=$((cleaned + 1))
+            fi
+        done
+        [ $cleaned -gt 0 ] && echo "Cleaned $cleaned stale venv(s)"
+        exit 0  # always succeed
+    )
+fi
+
 # Trap signals for graceful shutdown
 cleanup() {
     echo ""
@@ -69,8 +97,14 @@ start_isolated_app() {
     if [[ ! -f "$python_exe" ]]; then
         echo "Creating venv at: $venv_path"
         
-        # Remove existing invalid venv
-        [[ -d "$venv_path" ]] && rm -rf "$venv_path"
+        # Remove existing invalid venv (subshell avoids set -e on permission errors)
+        if [[ -d "$venv_path" ]]; then
+            echo "  Removing stale venv..."
+            (set +e; chmod -R u+rwX "$venv_path" 2>/dev/null; rm -rf "$venv_path" 2>/dev/null; exit 0)
+            if [[ -d "$venv_path" ]]; then
+                echo "WARNING: Could not fully remove old venv at $venv_path" >&2
+            fi
+        fi
         
         # Create venv using uv if available
         if command -v uv &> /dev/null; then

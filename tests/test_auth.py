@@ -23,6 +23,7 @@ from pyrest.auth import (
     authenticated,
     require_roles,
 )
+from tests.conftest import TEST_JWT_SECRET
 
 
 class TestAuthConfig:
@@ -82,7 +83,7 @@ class TestJWTAuth:
         AuthConfig._instance = None
 
         with patch("pyrest.auth.get_auth_config") as mock:
-            mock.return_value.jwt_secret = "test-secret"
+            mock.return_value.jwt_secret = TEST_JWT_SECRET
             mock.return_value.jwt_expiry_hours = 24
             mock.return_value.jwt_algorithm = "HS256"
 
@@ -98,7 +99,7 @@ class TestJWTAuth:
         assert isinstance(token, str)
 
         # Decode and verify
-        decoded = jwt.decode(token, "test-secret", algorithms=["HS256"])
+        decoded = jwt.decode(token, TEST_JWT_SECRET, algorithms=["HS256"])
         assert decoded["sub"] == "testuser"
         assert decoded["role"] == "admin"
         assert "exp" in decoded
@@ -121,7 +122,7 @@ class TestJWTAuth:
             "exp": datetime.utcnow() - timedelta(hours=1),
             "iat": datetime.utcnow() - timedelta(hours=2),
         }
-        expired_token = jwt.encode(expired_payload, "test-secret", algorithm="HS256")
+        expired_token = jwt.encode(expired_payload, TEST_JWT_SECRET, algorithm="HS256")
 
         with pytest.raises(AuthError) as exc_info:
             jwt_auth.verify_token(expired_token)
@@ -159,7 +160,7 @@ class TestAzureADAuth:
         with patch("pyrest.auth.get_auth_config") as mock:
             mock.return_value.tenant_id = "test-tenant"
             mock.return_value.client_id = "test-client"
-            mock.return_value.client_secret = "test-secret"
+            mock.return_value.client_secret = TEST_JWT_SECRET
             mock.return_value.redirect_uri = "http://localhost/callback"
             mock.return_value.scopes = ["openid", "profile"]
             mock.return_value.is_configured = True
@@ -236,12 +237,12 @@ class TestAuthManager:
         AuthConfig._instance = None
 
         with patch("pyrest.auth.get_auth_config") as mock:
-            mock.return_value.jwt_secret = "test-secret"
+            mock.return_value.jwt_secret = TEST_JWT_SECRET
             mock.return_value.jwt_expiry_hours = 24
             mock.return_value.jwt_algorithm = "HS256"
             mock.return_value.tenant_id = "test-tenant"
             mock.return_value.client_id = "test-client"
-            mock.return_value.client_secret = "test-secret"
+            mock.return_value.client_secret = TEST_JWT_SECRET
             mock.return_value.redirect_uri = "http://localhost/callback"
             mock.return_value.scopes = ["openid"]
             mock.return_value.is_configured = True
@@ -299,7 +300,7 @@ class TestAuthDecorators:
         AuthConfig._instance = None
 
         with patch("pyrest.auth.get_auth_config") as mock:
-            mock.return_value.jwt_secret = "test-secret"
+            mock.return_value.jwt_secret = TEST_JWT_SECRET
             mock.return_value.jwt_expiry_hours = 24
             mock.return_value.jwt_algorithm = "HS256"
 

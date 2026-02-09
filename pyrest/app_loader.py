@@ -189,9 +189,6 @@ class AppLoader:
                     except Exception as e:
                         error_msg = f"Error loading app: {e!s}"
                         logger.exception(f"Error loading app {item.name}: {e}")
-                        import traceback
-
-                        logger.debug(traceback.format_exc())
                         self.failed_apps[item.name] = {
                             "name": item.name,
                             "path": str(item),
@@ -240,9 +237,6 @@ class AppLoader:
 
         except Exception as e:
             logger.exception(f"Error loading module for {app_config.name}: {e}")
-            import traceback
-
-            traceback.print_exc()
             return None
 
         return module
@@ -311,14 +305,29 @@ class AppLoader:
         app_config.port = port
         return port
 
-    def load_all_apps(self) -> list[tuple]:
+    def load_all_apps(self, app_filter: str | None = None) -> list[tuple]:
         """
         Discover and load all apps, returning handlers for embedded apps.
         Isolated apps are stored separately for later spawning.
         Failed apps are tracked but don't prevent other apps from loading.
+
+        Args:
+            app_filter: If set, only load the app whose name matches (case-insensitive).
+                        All other apps are skipped entirely. Useful for single-app dev mode.
         """
         all_handlers = []
         apps = self.discover_apps()
+
+        if app_filter:
+            matched = [a for a in apps if a.name.lower() == app_filter.lower()]
+            if not matched:
+                available = ", ".join(a.name for a in apps)
+                logger.error(
+                    f"App '{app_filter}' not found. Available apps: {available}"
+                )
+                return all_handlers
+            logger.info(f"Single-app mode: loading only '{matched[0].name}'")
+            apps = matched
 
         for app_config in apps:
             try:
@@ -333,9 +342,6 @@ class AppLoader:
                     except Exception as e:
                         error_msg = f"Failed to setup isolated app: {e!s}"
                         logger.exception(f"Error setting up isolated app {app_config.name}: {e}")
-                        import traceback
-
-                        logger.debug(traceback.format_exc())
                         self.failed_apps[app_config.name] = {
                             "name": app_config.name,
                             "path": str(app_config.path),
@@ -377,9 +383,6 @@ class AppLoader:
                     except Exception as e:
                         error_msg = f"Error loading embedded app: {e!s}"
                         logger.exception(f"Error loading embedded app {app_config.name}: {e}")
-                        import traceback
-
-                        logger.debug(traceback.format_exc())
                         self.failed_apps[app_config.name] = {
                             "name": app_config.name,
                             "path": str(app_config.path),
@@ -390,9 +393,6 @@ class AppLoader:
                 # Catch any unexpected errors during app processing
                 error_msg = f"Unexpected error processing app: {e!s}"
                 logger.exception(f"Unexpected error processing app {app_config.name}: {e}")
-                import traceback
-
-                logger.debug(traceback.format_exc())
                 self.failed_apps[app_config.name] = {
                     "name": app_config.name,
                     "path": str(app_config.path) if hasattr(app_config, "path") else "unknown",

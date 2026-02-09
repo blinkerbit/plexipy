@@ -1,70 +1,74 @@
-# PyRest Development Docker Compose
-# Single Container with Python + Nginx (Alpine-based)
+# =============================================================================
+# PyRest Dev Environment (standalone — no IDE required)
+# =============================================================================
 #
 # Usage:
-#   docker-compose -f docker-compose.dev.yml up -d
-#   docker-compose -f docker-compose.dev.yml logs -f pyrest-dev
-#   docker-compose -f docker-compose.dev.yml exec pyrest-dev bash
+#   docker-compose -f docker-compose.dev.yml up -d --build   # Build & start
+#   docker-compose -f docker-compose.dev.yml exec dev bash    # Open shell
+#   docker-compose -f docker-compose.dev.yml logs -f dev      # View logs
+#   docker-compose -f docker-compose.dev.yml down             # Stop
 #
-# Features:
-#   - Hot reload with volume mounts (changes reflect immediately)
-#   - Debug mode enabled
-#   - Full source code access (read-write)
-#   - Logs directory mounted for easy access
-#   - Embedded Nginx reverse proxy for isolated apps
+# This creates the same environment as the Dev Container (.devcontainer/)
+# but without Cursor/VS Code integration.  Code lives INSIDE the container
+# (no bind mounts), so there are no Windows/Linux permission issues.
 #
-# Volume Mounts:
-#   - Source code: ./pyrest, ./apps (read-write for live editing)
-#   - Config files: config.json, auth_config.json (read-write)
-#   - Logs: ./logs (persistent logs outside container)
-#   - Nginx config: ./nginx (for generated configs)
-#   - setup_pip.sh: pip proxy configuration
+# To persist code changes between rebuilds, use `docker cp` or commit to git
+# from inside the container.
 #
 # Access:
-#   - Via Nginx: http://localhost:8080/pyrest/
-#   - Direct API: http://localhost:8000/pyrest/
-#   - Embedded apps: http://localhost:8080/pyrest/hello/
-#   - Isolated apps: http://localhost:8080/pyrest/tm1query/ (via nginx)
+#   Nginx proxy:  http://localhost:8080/pyrest/
+#   PyRest API:   http://localhost:8000/pyrest/
+#   Admin UI:     http://localhost:8000/pyrest/admin/
+# =============================================================================
 
 version: '3.8'
 
 services:
-  pyrest-dev:
+  dev:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: .devcontainer/Dockerfile
     container_name: pyrest-dev
     restart: unless-stopped
     ports:
-      - "8080:80" # Nginx (reverse proxy) - access all apps via http://localhost:8080/pyrest/
-      - "8000:8000" # Main PyRest server (for direct access if needed)
-      - "8001:8001" # Isolated app: tm1data
-      - "8002:8002" # Isolated app: tm1query
+      - "8080:8080"   # Nginx
+      - "8000:8000"   # PyRest main
+      - "8001:8001"   # Isolated app 1
+      - "8002:8002"   # Isolated app 2
+      - "8003:8003"   # Isolated app 3
     environment:
       - PYREST_HOST=0.0.0.0
       - PYREST_PORT=8000
       - PYREST_DEBUG=true
+      - PYREST_CLEAN_VENVS=false
     volumes:
-      # Mount source code for hot reload (read-write for development)
-      - ./pyrest:/app/pyrest
-      - ./apps:/app/apps
-      - ./main.py:/app/main.py
-      - ./config.json:/app/config.json
-      - ./auth_config.json:/app/auth_config.json
-      - ./setup_pip.sh:/app/setup_pip.sh
-      - ./nginx:/app/nginx
-      - ./logs:/app/logs
-      # Mount .env file if it exists (optional)
-      - ./.env:/app/.env:ro
-    networks:
-      - pyrest-dev-network
+      # Named volumes — no bind mounts, no permission issues
+      - dev-logs:/app/logs
+      - dev-venv-pov:/app/apps/pov/.venv
+      - dev-venv-tm1data:/app/apps/tm1data/.venv
+      - dev-venv-tm1query:/app/apps/tm1query/.venv
+    # First-time: set up venvs, then start all services + keep alive
+    command: >
+      bash -c "
+        bash .devcontainer/post-create.sh &&
+        bash .devcontainer/post-start.sh &&
+        python main.py --debug --no-isolated
+      "
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/nginx-health" ]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/pyrest/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 30s
+    networks:
+      - pyrest-dev-network
 
 networks:
   pyrest-dev-network:
     driver: bridge
+
+volumes:
+  dev-logs:
+  dev-venv-pov:
+  dev-venv-tm1data:
+  dev-venv-tm1query:
