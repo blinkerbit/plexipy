@@ -199,7 +199,7 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
             f"{BASE_PATH}/auth/register",
             method="POST",
             body=json.dumps(
-                {"username": "testuser", "password": "testpass", "email": "test@example.com"}
+                {"username": "testuser", "password": TEST_PASSWORD, "email": "test@example.com"}  
             ),
             headers={
                 "Content-Type": "application/json",
