@@ -31,7 +31,8 @@ async def _run_cmd(
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        async with asyncio.timeout(timeout):
+            stdout_bytes, stderr_bytes = await proc.communicate()
     except TimeoutError:
         proc.kill()
         await proc.wait()
@@ -135,12 +136,35 @@ class VenvManager:
     # Async operations
     # ------------------------------------------------------------------
 
+    def _parse_env_line(self, line: str) -> tuple[str, str] | None:
+        """Helper to parse a KEY=VALUE line."""
+        line = line.strip()
+        if not line or line.startswith("#"):
+            return None
+        
+        if line.startswith("export "):
+            line = line[7:].strip()
+            
+        if "=" in line:
+            key, value = line.split("=", 1)
+            return key.strip(), value.strip().strip('"').strip("'")
+        return None
+
+    def _apply_env_vars(self, lines: list[str]) -> None:
+        """Helper to parse and apply env vars from lines."""
+        for line in lines:
+            kv = self._parse_env_line(line)
+            if kv:
+                os.environ[kv[0]] = kv[1]
+
     async def _load_pip_env(self) -> None:
         """Async: source setup_pip.sh to load proxy env vars."""
         if not self._setup_pip_script.exists():
             return
+            
         try:
             if os.access(self._setup_pip_script, os.X_OK):
+                # Script is executable, try running it
                 rc, stdout, _ = await _run_cmd(
                     "bash",
                     "-c",
@@ -148,22 +172,12 @@ class VenvManager:
                     timeout=10,
                 )
                 if rc == 0:
-                    for line in stdout.splitlines():
-                        if "=" in line and not line.startswith("#"):
-                            key, value = line.split("=", 1)
-                            os.environ[key] = value
+                    self._apply_env_vars(stdout.splitlines())
             else:
-                # Fallback: parse the script (fast, use to_thread for safety)
+                # Script is not executable, parse manually
                 content = await asyncio.to_thread(self._setup_pip_script.read_text)
-                for line in content.splitlines():
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if line.startswith("export "):
-                        line = line[7:].strip()
-                    if "=" in line:
-                        key, value = line.split("=", 1)
-                        os.environ[key.strip()] = value.strip().strip('"').strip("'")
+                self._apply_env_vars(content.splitlines())
+                        
         except Exception as e:
             logger.warning(f"Failed to load pip env from setup_pip.sh: {e}")
 
@@ -217,6 +231,51 @@ class VenvManager:
             logger.exception(error_msg)
             return False, error_msg
 
+    async def _install_with_uv(
+        self, venv_path: Path, requirements_file: Path
+    ) -> tuple[int, str, str]:
+        """Install requirements using uv."""
+        logger.info("Installing packages using uv...")
+        return await _run_cmd(
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            str(self.get_python_executable(venv_path)),
+            "-r",
+            str(requirements_file),
+            timeout=300,
+        )
+
+    async def _install_with_pip(
+        self, venv_path: Path, requirements_file: Path
+    ) -> tuple[int, str, str]:
+        """Install requirements using pip."""
+        pip_exe = self.get_pip_executable(venv_path)
+        logger.info("Upgrading pip...")
+        
+        # Upgrade pip first
+        up_rc, up_out, up_err = await _run_cmd(
+            str(pip_exe),
+            "install",
+            "--upgrade",
+            "pip",
+            timeout=60,
+        )
+        if up_rc != 0:
+            logger.warning(f"pip upgrade failed: {up_err}")
+        else:
+            logger.info(f"pip upgraded: {up_out.strip()}")
+
+        logger.info("Installing packages using pip...")
+        return await _run_cmd(
+            str(pip_exe),
+            "install",
+            "-r",
+            str(requirements_file),
+            timeout=300,
+        )
+
     async def install_requirements(
         self, venv_path: Path, requirements_file: Path
     ) -> tuple[bool, str]:
@@ -250,40 +309,9 @@ class VenvManager:
 
         try:
             if self._uv_available:
-                logger.info("Installing packages using uv...")
-                rc, stdout, stderr = await _run_cmd(
-                    "uv",
-                    "pip",
-                    "install",
-                    "--python",
-                    str(self.get_python_executable(venv_path)),
-                    "-r",
-                    str(requirements_file),
-                    timeout=300,
-                )
+                rc, stdout, stderr = await self._install_with_uv(venv_path, requirements_file)
             else:
-                # Upgrade pip first
-                logger.info("Upgrading pip...")
-                up_rc, up_out, up_err = await _run_cmd(
-                    str(pip_exe),
-                    "install",
-                    "--upgrade",
-                    "pip",
-                    timeout=60,
-                )
-                if up_rc != 0:
-                    logger.warning(f"pip upgrade failed: {up_err}")
-                else:
-                    logger.info(f"pip upgraded: {up_out.strip()}")
-
-                logger.info("Installing packages using pip...")
-                rc, stdout, stderr = await _run_cmd(
-                    str(pip_exe),
-                    "install",
-                    "-r",
-                    str(requirements_file),
-                    timeout=300,
-                )
+                rc, stdout, stderr = await self._install_with_pip(venv_path, requirements_file)
 
             if stdout:
                 logger.info(f"{installer} install stdout:\n{stdout}")

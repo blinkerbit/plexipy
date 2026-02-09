@@ -81,6 +81,49 @@ class AppConfigParser:
         if isinstance(tm1_instances, dict):
             self._process_tm1_instances(tm1_instances)
 
+    def _process_single_tm1_instance(self, instance_name: str, instance_config: dict[str, Any]) -> None:
+        """Process a single TM1 instance configuration."""
+        self._instance_vars[instance_name] = {}
+
+        for param, value in instance_config.items():
+            # Convert value to string
+            if isinstance(value, (dict, list)):
+                str_value = json.dumps(value)
+            elif isinstance(value, bool):
+                str_value = str(value).lower()
+            else:
+                str_value = str(value)
+
+            # Resolve any environment variable references
+            resolved_value = self._resolve_value(param, str_value)
+            if isinstance(resolved_value, str):
+                str_value = resolved_value
+            elif isinstance(resolved_value, bool):
+                str_value = str(resolved_value).lower()
+            else:
+                str_value = str(resolved_value)
+
+            # Store in instance vars
+            self._instance_vars[instance_name][param] = str_value
+
+            # Set prefixed environment variable: <app_name>.tm1.<instance>.<param>
+            prefixed_key = f"{self.app_name}.tm1.{instance_name}.{param}"
+            os.environ[prefixed_key] = str_value
+            self._os_vars[prefixed_key] = str_value
+            _sensitive = {"password", "client_secret", "api_key", "secret", "token"}
+            safe_value = "****" if param.lower() in _sensitive else str_value
+            logger.debug("Set instance env var: %s=%s", prefixed_key, safe_value)
+
+            # For isolated apps, also set in TM1_<INSTANCE>_<PARAM> format
+            if self.is_isolated:
+                instance_env_key = f"TM1_{instance_name.upper()}_{param.upper()}"
+                if instance_env_key not in os.environ:
+                    os.environ[instance_env_key] = str_value
+                    self._os_vars[instance_env_key] = str_value
+                    logger.debug(
+                        f"Set isolated instance env var: {instance_env_key}={str_value}"
+                    )
+
     def _process_tm1_instances(self, tm1_instances: dict[str, dict[str, Any]]) -> None:
         """
         Process tm1_instances section and set environment variables.
@@ -92,47 +135,7 @@ class AppConfigParser:
         for instance_name, instance_config in tm1_instances.items():
             if not isinstance(instance_config, dict):
                 continue
-
-            self._instance_vars[instance_name] = {}
-
-            for param, value in instance_config.items():
-                # Convert value to string
-                if isinstance(value, (dict, list)):
-                    str_value = json.dumps(value)
-                elif isinstance(value, bool):
-                    str_value = str(value).lower()
-                else:
-                    str_value = str(value)
-
-                # Resolve any environment variable references
-                resolved_value = self._resolve_value(param, str_value)
-                if isinstance(resolved_value, str):
-                    str_value = resolved_value
-                elif isinstance(resolved_value, bool):
-                    str_value = str(resolved_value).lower()
-                else:
-                    str_value = str(resolved_value)
-
-                # Store in instance vars
-                self._instance_vars[instance_name][param] = str_value
-
-                # Set prefixed environment variable: <app_name>.tm1.<instance>.<param>
-                prefixed_key = f"{self.app_name}.tm1.{instance_name}.{param}"
-                os.environ[prefixed_key] = str_value
-                self._os_vars[prefixed_key] = str_value
-                _sensitive = {"password", "client_secret", "api_key", "secret", "token"}
-                safe_value = "****" if param.lower() in _sensitive else str_value
-                logger.debug("Set instance env var: %s=%s", prefixed_key, safe_value)
-
-                # For isolated apps, also set in TM1_<INSTANCE>_<PARAM> format
-                if self.is_isolated:
-                    instance_env_key = f"TM1_{instance_name.upper()}_{param.upper()}"
-                    if instance_env_key not in os.environ:
-                        os.environ[instance_env_key] = str_value
-                        self._os_vars[instance_env_key] = str_value
-                        logger.debug(
-                            f"Set isolated instance env var: {instance_env_key}={str_value}"
-                        )
+            self._process_single_tm1_instance(instance_name, instance_config)
 
         # Also store the resolved tm1_instances in the config
         self._resolved_config["tm1_instances"] = {

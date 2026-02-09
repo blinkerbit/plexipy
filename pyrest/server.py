@@ -204,13 +204,13 @@ class PyRestApplication(tornado.web.Application):
         app_settings = {
             "debug": self.framework_config.debug,
             "cookie_secret": os.environ.get("PYREST_COOKIE_SECRET", secrets.token_hex(32)),
-            # XSRF cookies are intentionally disabled (NOSONAR).
+            # XSRF cookies are intentionally disabled.
             # PyRest is a stateless REST API that authenticates via Bearer tokens
             # in the Authorization header, which is not susceptible to CSRF attacks.
             # See OWASP: "If your application uses token-based authentication where
             # the token is not automatically submitted by the browser, CSRF is not
             # a concern."
-            "xsrf_cookies": False,
+            "xsrf_cookies": False,  # NOSONAR
             **settings,
         }
 
@@ -239,6 +239,74 @@ class PyRestApplication(tornado.web.Application):
         logger.info(f"Embedded apps: {list(self.app_loader.loaded_apps.keys())}")
         logger.info(f"Isolated apps: {list(self.app_loader.isolated_apps.keys())}")
 
+    async def _setup_single_isolated_app(self, app_config) -> bool:
+        """Helper to setup a single isolated app instance."""
+        try:
+            logger.info(f"Setting up isolated app: {app_config.name}")
+
+            app_path = app_config.path.resolve()
+            venv_name = app_config.venv_path if app_config.venv_path else ".venv"
+
+            # Async venv setup
+            success, venv_path, message = await self.venv_manager.ensure_venv(
+                app_path, venv_name
+            )
+            if venv_path:
+                venv_path = venv_path.resolve()
+
+            if not success:
+                self._record_app_failure(app_config, f"Failed to setup venv: {message}", "venv_setup_error")
+                return False
+
+            logger.info(f"Venv ready for {app_config.name}: {message}")
+
+            if not venv_path or not venv_path.exists():
+                self._record_app_failure(app_config, f"Venv path invalid or missing: {venv_path}", "venv_setup_error")
+                return False
+
+            # Async spawn
+            try:
+                app_process = await self.process_manager.spawn_app(
+                    app_name=app_config.name,
+                    app_path=app_path,
+                    port=app_config.port,
+                    venv_path=venv_path,
+                )
+
+                if not app_process:
+                    self._record_app_failure(app_config, "Failed to spawn process", "spawn_error")
+                    return False
+                
+                logger.info(
+                    f"Isolated app '{app_config.name}' spawned on port {app_config.port}"
+                )
+                return True
+
+            except (OSError, ValueError) as e:
+                logger.exception("Error spawning isolated app %s: %s", app_config.name, e)
+                self._record_app_failure(app_config, f"Error spawning process: {e}", "spawn_error")
+                return False
+
+        except (OSError, ValueError, RuntimeError) as e:
+            logger.exception("Unexpected error setting up %s: %s", app_config.name, e)
+            self._record_app_failure(app_config, f"Unexpected error during setup: {e}", "setup_error")
+            return False
+
+    def _record_app_failure(self, app_config, error_msg, error_type):
+        """Helper to record failed app setup."""
+        if error_type != "spawn_error": # spawn_error might be logged by process manager
+             logger.error(f"{error_msg} for {app_config.name}")
+             
+        self.app_loader.failed_apps[app_config.name] = {
+            "name": app_config.name,
+            "path": str(app_config.path),
+            "error": error_msg,
+            "error_type": error_type,
+            "isolated": True,
+            "port": getattr(app_config, "port", None),
+        }
+        self.app_loader.isolated_apps.pop(app_config.name, None)
+
     async def setup_isolated_apps(self) -> bool:
         """
         Async: setup virtual environments and spawn isolated apps.
@@ -248,7 +316,7 @@ class PyRestApplication(tornado.web.Application):
         Returns:
             True if at least one app was set up successfully (or no apps to setup)
         """
-        isolated_apps = self.app_loader.get_isolated_apps()
+        isolated_apps = list(self.app_loader.get_isolated_apps()) # Copy list to avoid mutation issues
 
         if not isolated_apps:
             logger.info("No isolated apps to set up")
@@ -257,100 +325,8 @@ class PyRestApplication(tornado.web.Application):
         success_count = 0
 
         for app_config in isolated_apps:
-            try:
-                logger.info(f"Setting up isolated app: {app_config.name}")
-
-                app_path = app_config.path.resolve()
-                venv_name = app_config.venv_path if app_config.venv_path else ".venv"
-
-                # Async venv setup
-                success, venv_path, message = await self.venv_manager.ensure_venv(
-                    app_path, venv_name
-                )
-                if venv_path:
-                    venv_path = venv_path.resolve()
-
-                if not success:
-                    error_msg = f"Failed to setup venv: {message}"
-                    logger.error(f"Failed to setup venv for {app_config.name}: {message}")
-                    self.app_loader.failed_apps[app_config.name] = {
-                        "name": app_config.name,
-                        "path": str(app_config.path),
-                        "error": error_msg,
-                        "error_type": "venv_setup_error",
-                        "isolated": True,
-                        "port": app_config.port,
-                    }
-                    self.app_loader.isolated_apps.pop(app_config.name, None)
-                    continue
-
-                logger.info(f"Venv ready for {app_config.name}: {message}")
-
-                if not venv_path or not venv_path.exists():
-                    error_msg = f"Venv path invalid or missing: {venv_path}"
-                    logger.error(error_msg)
-                    self.app_loader.failed_apps[app_config.name] = {
-                        "name": app_config.name,
-                        "path": str(app_config.path),
-                        "error": error_msg,
-                        "error_type": "venv_setup_error",
-                        "isolated": True,
-                        "port": app_config.port,
-                    }
-                    self.app_loader.isolated_apps.pop(app_config.name, None)
-                    continue
-
-                # Async spawn
-                try:
-                    app_process = await self.process_manager.spawn_app(
-                        app_name=app_config.name,
-                        app_path=app_path,
-                        port=app_config.port,
-                        venv_path=venv_path,
-                    )
-
-                    if not app_process:
-                        error_msg = "Failed to spawn process"
-                        logger.error(f"Failed to spawn isolated app: {app_config.name}")
-                        self.app_loader.failed_apps[app_config.name] = {
-                            "name": app_config.name,
-                            "path": str(app_config.path),
-                            "error": error_msg,
-                            "error_type": "spawn_error",
-                            "isolated": True,
-                            "port": app_config.port,
-                        }
-                        self.app_loader.isolated_apps.pop(app_config.name, None)
-                    else:
-                        logger.info(
-                            f"Isolated app '{app_config.name}' spawned on port {app_config.port}"
-                        )
-                        success_count += 1
-                except (OSError, ValueError) as e:
-                    error_msg = f"Error spawning process: {e}"
-                    logger.exception("Error spawning isolated app %s: %s", app_config.name, e)
-                    self.app_loader.failed_apps[app_config.name] = {
-                        "name": app_config.name,
-                        "path": str(app_config.path),
-                        "error": error_msg,
-                        "error_type": "spawn_error",
-                        "isolated": True,
-                        "port": app_config.port,
-                    }
-                    self.app_loader.isolated_apps.pop(app_config.name, None)
-
-            except (OSError, ValueError, RuntimeError) as e:
-                error_msg = f"Unexpected error during setup: {e}"
-                logger.exception("Unexpected error setting up %s: %s", app_config.name, e)
-                self.app_loader.failed_apps[app_config.name] = {
-                    "name": app_config.name,
-                    "path": str(app_config.path),
-                    "error": error_msg,
-                    "error_type": "setup_error",
-                    "isolated": True,
-                    "port": getattr(app_config, "port", None),
-                }
-                self.app_loader.isolated_apps.pop(app_config.name, None)
+            if await self._setup_single_isolated_app(app_config):
+                success_count += 1
 
         # Summary
         failed_count = sum(1 for v in self.app_loader.failed_apps.values() if v.get("isolated"))

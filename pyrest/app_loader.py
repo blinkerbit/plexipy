@@ -147,6 +147,42 @@ class AppLoader:
         self._handlers: list[tuple] = []
         self._next_port = self.config.isolated_app_base_port
 
+    def _load_app_config(self, item: Path) -> AppConfig | None:
+        """Helper to load configuration for a single app."""
+        config_file = item / "config.json"
+        
+        if not config_file.exists():
+            logger.warning(f"No config.json found in {item.name}, skipping")
+            return None
+
+        try:
+            with config_file.open() as f:
+                config_data = json.load(f)
+
+            app_config = AppConfig(item, config_data)
+            
+            if not app_config.enabled:
+                logger.info(f"Skipping disabled app: {app_config.name}")
+                return None
+            
+            return app_config
+
+        except json.JSONDecodeError as e:
+            logger.exception(f"Invalid config.json in {item.name}: {e}")
+            self._record_failure(
+                AppConfig(item, {"name": item.name}),  # Minimal config for error reporting
+                f"Invalid config.json: {e!s}",
+                "config_error",
+            )
+        except Exception as e:
+            logger.exception(f"Error loading app {item.name}: {e}")
+            self._record_failure(
+                AppConfig(item, {"name": item.name}),
+                f"Error loading app: {e!s}",
+                "load_error",
+            )
+        return None
+
     def discover_apps(self) -> list[AppConfig]:
         """
         Discover all apps in the apps folder.
@@ -162,41 +198,10 @@ class AppLoader:
         # Sort directories alphabetically for consistent port assignment
         for item in sorted(self.apps_folder.iterdir(), key=lambda x: x.name):
             if item.is_dir() and not item.name.startswith("_"):
-                config_file = item / "config.json"
-
-                if config_file.exists():
-                    try:
-                        with config_file.open() as f:
-                            config_data = json.load(f)
-
-                        app_config = AppConfig(item, config_data)
-
-                        if app_config.enabled:
-                            apps.append(app_config)
-                            logger.info(f"Discovered app: {app_config.name} at {app_config.prefix}")
-                        else:
-                            logger.info(f"Skipping disabled app: {app_config.name}")
-
-                    except json.JSONDecodeError as e:
-                        error_msg = f"Invalid config.json: {e!s}"
-                        logger.exception(f"Invalid config.json in {item.name}: {e}")
-                        self.failed_apps[item.name] = {
-                            "name": item.name,
-                            "path": str(item),
-                            "error": error_msg,
-                            "error_type": "config_error",
-                        }
-                    except Exception as e:
-                        error_msg = f"Error loading app: {e!s}"
-                        logger.exception(f"Error loading app {item.name}: {e}")
-                        self.failed_apps[item.name] = {
-                            "name": item.name,
-                            "path": str(item),
-                            "error": error_msg,
-                            "error_type": "load_error",
-                        }
-                else:
-                    logger.warning(f"No config.json found in {item.name}, skipping")
+                app_config = self._load_app_config(item)
+                if app_config:
+                    apps.append(app_config)
+                    logger.info(f"Discovered app: {app_config.name} at {app_config.prefix}")
 
         return apps
 
@@ -241,57 +246,66 @@ class AppLoader:
 
         return module
 
+    def _get_raw_handlers(self, app_config: AppConfig, module: Any) -> list[tuple]:
+        """Extract raw handlers from module."""
+        if hasattr(module, "get_handlers"):
+            try:
+                return module.get_handlers()
+            except Exception as e:
+                logger.exception(f"Error calling get_handlers in {app_config.name}: {e}")
+                return []
+        elif hasattr(module, "handlers"):
+            return module.handlers
+        
+        logger.warning(f"No get_handlers() or handlers list in {app_config.name}")
+        return []
+
+    def _process_handler_tuple(
+        self, app_config: AppConfig, handler_tuple: tuple
+    ) -> tuple | None:
+        """Process a single handler tuple."""
+        if len(handler_tuple) < 2:
+            return None
+
+        path = handler_tuple[0]
+        handler_class = handler_tuple[1]
+
+        # Ensure path starts with /
+        if not path.startswith("/"):
+            path = "/" + path
+
+        # Create the full path with BASE_PATH and app prefix
+        prefix = app_config.prefix.rstrip("/")
+        base_path = f"{BASE_PATH}{prefix}{path}".rstrip("/")
+        full_path = rf"{base_path}/?"
+
+        # Handle additional init kwargs
+        if len(handler_tuple) >= 3:
+            init_kwargs = (
+                handler_tuple[2].copy() if isinstance(handler_tuple[2], dict) else {}
+            )
+        else:
+            init_kwargs = {}
+
+        # Add app config to init kwargs (both raw and resolved)
+        init_kwargs["app_config"] = app_config._raw_config
+        init_kwargs["app_config_parser"] = app_config.config_parser
+
+        logger.debug(f"Registered handler: {full_path} -> {handler_class.__name__}")
+        return (full_path, handler_class, init_kwargs)
+
     def get_app_handlers(self, app_config: AppConfig, module: Any) -> list[tuple]:
         """
         Get handlers from an app module.
         The module should have a 'get_handlers' function or a 'handlers' list.
         """
         handlers = []
-
-        # Try get_handlers function first
-        if hasattr(module, "get_handlers"):
-            try:
-                raw_handlers = module.get_handlers()
-            except Exception as e:
-                logger.exception(f"Error calling get_handlers in {app_config.name}: {e}")
-                return handlers
-        elif hasattr(module, "handlers"):
-            raw_handlers = module.handlers
-        else:
-            logger.warning(f"No get_handlers() or handlers list in {app_config.name}")
-            return handlers
-
-        # Prefix all handler paths with BASE_PATH and app prefix
-        prefix = app_config.prefix.rstrip("/")
+        raw_handlers = self._get_raw_handlers(app_config, module)
 
         for handler_tuple in raw_handlers:
-            if len(handler_tuple) >= 2:
-                path = handler_tuple[0]
-                handler_class = handler_tuple[1]
-
-                # Ensure path starts with /
-                if not path.startswith("/"):
-                    path = "/" + path
-
-                # Create the full path with BASE_PATH and app prefix
-                # Use regex pattern with optional trailing slash for flexible matching
-                base_path = f"{BASE_PATH}{prefix}{path}".rstrip("/")
-                full_path = rf"{base_path}/?"
-
-                # Handle additional init kwargs
-                if len(handler_tuple) >= 3:
-                    init_kwargs = (
-                        handler_tuple[2].copy() if isinstance(handler_tuple[2], dict) else {}
-                    )
-                else:
-                    init_kwargs = {}
-
-                # Add app config to init kwargs (both raw and resolved)
-                init_kwargs["app_config"] = app_config._raw_config
-                init_kwargs["app_config_parser"] = app_config.config_parser
-
-                handlers.append((full_path, handler_class, init_kwargs))
-                logger.debug(f"Registered handler: {full_path} -> {handler_class.__name__}")
+            processed = self._process_handler_tuple(app_config, handler_tuple)
+            if processed:
+                handlers.append(processed)
 
         return handlers
 
@@ -305,6 +319,19 @@ class AppLoader:
         app_config.port = port
         return port
 
+    def _record_failure(
+        self, app_config: AppConfig, error: str, error_type: str
+    ) -> None:
+        """Helper to record app failure."""
+        self.failed_apps[app_config.name] = {
+            "name": app_config.name,
+            "path": str(app_config.path),
+            "error": error,
+            "error_type": error_type,
+        }
+        if hasattr(app_config, "is_isolated") and app_config.is_isolated:
+            self.failed_apps[app_config.name]["isolated"] = True
+
     def _process_isolated_app(self, app_config: AppConfig) -> None:
         """Helper to process an isolated app."""
         try:
@@ -314,15 +341,10 @@ class AppLoader:
                 f"Discovered isolated app '{app_config.name}' (port: {app_config.port})"
             )
         except Exception as e:
-            error_msg = f"Failed to setup isolated app: {e!s}"
             logger.exception(f"Error setting up isolated app {app_config.name}: {e}")
-            self.failed_apps[app_config.name] = {
-                "name": app_config.name,
-                "path": str(app_config.path),
-                "error": error_msg,
-                "error_type": "isolated_setup_error",
-                "isolated": True,
-            }
+            self._record_failure(
+                app_config, f"Failed to setup isolated app: {e!s}", "isolated_setup_error"
+            )
 
     def _process_embedded_app(self, app_config: AppConfig) -> list[tuple]:
         """Helper to process an embedded app."""
@@ -338,32 +360,19 @@ class AppLoader:
                         f"Loaded embedded app '{app_config.name}' with {len(handlers)} handlers"
                     )
                 else:
-                    # Module loaded but no handlers found
-                    error_msg = "No handlers found in module"
                     logger.warning(f"App {app_config.name} loaded but has no handlers")
-                    self.failed_apps[app_config.name] = {
-                        "name": app_config.name,
-                        "path": str(app_config.path),
-                        "error": error_msg,
-                        "error_type": "no_handlers",
-                    }
-            # Module failed to load
+                    self._record_failure(
+                        app_config, "No handlers found in module", "no_handlers"
+                    )
             elif app_config.name not in self.failed_apps:
-                self.failed_apps[app_config.name] = {
-                    "name": app_config.name,
-                    "path": str(app_config.path),
-                    "error": "Failed to load module",
-                    "error_type": "module_load_error",
-                }
+                self._record_failure(
+                    app_config, "Failed to load module", "module_load_error"
+                )
         except Exception as e:
-            error_msg = f"Error loading embedded app: {e!s}"
             logger.exception(f"Error loading embedded app {app_config.name}: {e}")
-            self.failed_apps[app_config.name] = {
-                "name": app_config.name,
-                "path": str(app_config.path),
-                "error": error_msg,
-                "error_type": "load_error",
-            }
+            self._record_failure(
+                app_config, f"Error loading embedded app: {e!s}", "load_error"
+            )
         return handlers
 
     def load_all_apps(self, app_filter: str | None = None) -> list[tuple]:
@@ -400,14 +409,10 @@ class AppLoader:
                         all_handlers.extend(handlers)
             except Exception as e:
                 # Catch any unexpected errors during app processing
-                error_msg = f"Unexpected error processing app: {e!s}"
                 logger.exception(f"Unexpected error processing app {app_config.name}: {e}")
-                self.failed_apps[app_config.name] = {
-                    "name": app_config.name,
-                    "path": str(app_config.path) if hasattr(app_config, "path") else "unknown",
-                    "error": error_msg,
-                    "error_type": "unexpected_error",
-                }
+                self._record_failure(
+                    app_config, f"Unexpected error processing app: {e!s}", "unexpected_error"
+                )
 
         self._handlers = all_handlers
 

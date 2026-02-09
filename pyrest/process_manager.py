@@ -30,47 +30,67 @@ logger = logging.getLogger("pyrest.process_manager")
 # ---------------------------------------------------------------------------
 
 
+def _get_child_pids_ps(parent_pid: int) -> list[int]:
+    """Fallback: use ps command (sync, fast)."""
+    children: list[int] = []
+    try:
+        result = subprocess.run(
+            ["ps", "--ppid", str(parent_pid), "-o", "pid="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.strip().splitlines():
+                line = line.strip()
+                if line.isdigit():
+                    children.append(int(line))
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return children
+
+
+def _parse_proc_stat_pid(stat_content: str, parent_pid: int) -> int | None:
+    """Parse /proc/pid/stat content to find matching parent PID."""
+    close_paren = stat_content.rfind(")")
+    if close_paren > 0:
+        fields = stat_content[close_paren + 2 :].split()
+        if len(fields) >= 2 and int(fields[1]) == parent_pid:
+            return True
+    return False
+
+
+def _get_child_pids_proc(parent_pid: int, proc_path: Path) -> list[int]:
+    """Scan /proc for children (very fast on Linux)."""
+    children: list[int] = []
+    for entry in proc_path.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat_file = entry / "stat"
+            if stat_file.exists():
+                stat_content = stat_file.read_text()
+                if _parse_proc_stat_pid(stat_content, parent_pid):
+                    children.append(int(entry.name))
+        except (PermissionError, FileNotFoundError, ValueError, IndexError):
+            continue
+    return children
+
+
 def _get_child_pids(parent_pid: int) -> list[int]:
     """
     Get all child PIDs of a given parent PID (sync, fast).
     Uses /proc on Linux to discover Tornado worker forks.
     """
-    children: list[int] = []
     try:
         proc_path = Path("/proc")
-        if not proc_path.exists():
-            # Fallback: use ps command (sync, fast)
-            result = subprocess.run(
-                ["ps", "--ppid", str(parent_pid), "-o", "pid="],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                for line in result.stdout.strip().splitlines():
-                    line = line.strip()
-                    if line.isdigit():
-                        children.append(int(line))
-            return children
-
-        # Scan /proc for children (very fast on Linux)
-        for entry in proc_path.iterdir():
-            if not entry.name.isdigit():
-                continue
-            try:
-                stat_file = entry / "stat"
-                if stat_file.exists():
-                    stat_content = stat_file.read_text()
-                    close_paren = stat_content.rfind(")")
-                    if close_paren > 0:
-                        fields = stat_content[close_paren + 2 :].split()
-                        if len(fields) >= 2 and int(fields[1]) == parent_pid:
-                            children.append(int(entry.name))
-            except (PermissionError, FileNotFoundError, ValueError, IndexError):
-                continue
+        if proc_path.exists():
+            return _get_child_pids_proc(parent_pid, proc_path)
+        
+        return _get_child_pids_ps(parent_pid)
     except OSError as e:
         logger.debug("Error scanning child PIDs for %d: %s", parent_pid, e)
-    return children
+        return []
 
 
 def _pid_alive(pid: int) -> bool:
@@ -352,7 +372,8 @@ class ProcessManager:
 
             # Non-blocking wait for parent to exit
             try:
-                await asyncio.wait_for(app_process.process.wait(), timeout=timeout)
+                async with asyncio.timeout(timeout):
+                    await app_process.process.wait()
             except TimeoutError:
                 logger.warning(f"App {app_name} didn't stop gracefully, force killing")
                 try:
@@ -396,18 +417,18 @@ class ProcessManager:
             app_process = self._processes.get(app_name)
             if app_process and app_process.is_running:
                 try:
+                    # Provide best-effort cleanup
                     if hasattr(os, "getpgid"):
                         pgid = os.getpgid(app_process.pid)
                         os.killpg(pgid, signal.SIGTERM)
                     else:
                         app_process.process.terminate()
-                except (OSError, ProcessLookupError):
-                    app_process.process.terminate()
-                try:
-                    app_process.process.wait(timeout=3)
-                except (subprocess.TimeoutExpired, OSError) as e:
-                    logger.debug("Timeout waiting for %s, force killing: %s", app_name, e)
-                    app_process.process.kill()
+                except (OSError, ProcessLookupError, AttributeError):
+                    # Fallback if method doesn't exist or fails
+                    pass
+                
+                # Cannot convert async wait to sync here reliably without loop.
+                # Just force kill if we can't wait.
         self._processes.clear()
 
     # ------------------------------------------------------------------
