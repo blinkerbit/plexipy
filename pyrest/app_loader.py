@@ -162,7 +162,7 @@ class AppLoader:
             app_config = AppConfig(item, config_data)
             
             if not app_config.enabled:
-                logger.info(f"Skipping disabled app: {app_config.name}")
+                logger.debug(f"Skipping disabled app: {app_config.name}")
                 return None
             
             return app_config

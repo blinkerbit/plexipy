@@ -98,7 +98,7 @@ def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
         return True
-    except (OSError, ProcessLookupError):
+    except OSError:
         return False
 
 
@@ -367,7 +367,7 @@ class ProcessManager:
                 pgid = os.getpgid(parent_pid)
                 os.killpg(pgid, signal.SIGTERM)
                 logger.info(f"Sent SIGTERM to process group {pgid}")
-            except (OSError, ProcessLookupError):
+            except OSError:
                 app_process.process.terminate()
 
             # Non-blocking wait for parent to exit
@@ -379,7 +379,7 @@ class ProcessManager:
                 try:
                     pgid = os.getpgid(parent_pid)
                     os.killpg(pgid, signal.SIGKILL)
-                except (OSError, ProcessLookupError):
+                except OSError:
                     app_process.process.kill()
                 with contextlib.suppress(Exception):
                     await app_process.process.wait()
@@ -413,7 +413,7 @@ class ProcessManager:
 
     def _sync_shutdown_all(self) -> None:
         """Sync fallback for atexit (no event loop available)."""
-        for app_name in list(self._processes):
+        for app_name in self._processes:
             app_process = self._processes.get(app_name)
             if app_process and app_process.is_running:
                 try:
@@ -423,7 +423,7 @@ class ProcessManager:
                         os.killpg(pgid, signal.SIGTERM)
                     else:
                         app_process.process.terminate()
-                except (OSError, ProcessLookupError, AttributeError):
+                except (OSError, AttributeError):
                     # Fallback if method doesn't exist or fails
                     pass
                 

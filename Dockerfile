@@ -16,8 +16,8 @@ ARG PIP_TRUSTED_HOST=""
 
 # Labels (single instruction = single layer)
 LABEL maintainer="PyRest Team" \
-      description="PyRest - Tornado-based REST API Framework with Nginx" \
-      version="1.0.0"
+    description="PyRest - Tornado-based REST API Framework with Nginx" \
+    version="1.0.0"
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,8 +31,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install runtime-only system dependencies and create non-root user
 # Build tools (gcc, musl-dev, etc.) are installed separately below and removed after use
 RUN apk add --no-cache \
-        nginx \
-        bash \
+    nginx \
+    bash \
     && mkdir -p /run/nginx \
     && addgroup -g 1000 pyrest \
     && adduser -u 1000 -G pyrest -s /bin/bash -D pyrest
@@ -45,26 +45,26 @@ WORKDIR /app
 COPY requirements.txt pyproject.toml ./
 # hadolint ignore=DL3013,DL3018
 RUN apk add --no-cache --virtual .build-deps \
-        gcc \
-        musl-dev \
-        python3-dev \
-        libffi-dev \
-        openssl-dev \
+    gcc \
+    musl-dev \
+    python3-dev \
+    libffi-dev \
+    openssl-dev \
     && pip install --no-cache-dir uv \
     && uv pip install --system --no-cache \
-        'tornado>=6.4' 'pydantic>=2.0.0' 'PyJWT>=2.8.0' \
+    'tornado>=6.4' 'pydantic>=2.0.0' 'PyJWT>=2.8.0' \
     && apk del --no-network .build-deps
 
-# Copy application code (executables get 755, config/data get 644)
+# Copy application code (executables get 755, config/data get 755)
 COPY --chown=pyrest:pyrest --chmod=755 pyrest/ ./pyrest/
 COPY --chown=pyrest:pyrest --chmod=755 apps/ ./apps/
 COPY --chown=pyrest:pyrest --chmod=755 scripts/ ./scripts/
 COPY --chown=pyrest:pyrest --chmod=755 main.py .
 COPY --chown=pyrest:pyrest --chmod=755 setup_pip.sh .
-COPY --chown=pyrest:pyrest --chmod=644 config.json auth_config.json pyproject.toml ./
+COPY --chown=root:root --chmod=755 config.json auth_config.json pyproject.toml ./
 
 # Copy nginx configuration
-COPY --chown=pyrest:pyrest --chmod=644 nginx/docker-nginx.conf /etc/nginx/nginx.conf
+COPY --chown=pyrest:pyrest --chmod=755 nginx/docker-nginx.conf /etc/nginx/nginx.conf
 
 # Create directories, fix Windows line endings, set permissions -- single layer
 # No redundant chmod/chown since COPY --chown/--chmod already handled app files
@@ -84,7 +84,7 @@ EXPOSE 8080 8443 8000
 # Health check - verify both nginx and pyrest are responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget -q --spider http://localhost:8080/nginx-health && \
-        wget -q --spider http://localhost:8000/pyrest/health || exit 1
+    wget -q --spider http://localhost:8000/pyrest/health || exit 1
 
 # Use custom entrypoint that starts both nginx and pyrest
 CMD ["/app/scripts/entrypoint-unified.sh"]

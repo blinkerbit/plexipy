@@ -154,7 +154,7 @@ class AuthConfig:
                 with config_path.open() as f:
                     file_config = json.load(f)
                     default_config.update(file_config)
-        except (OSError, json.JSONDecodeError, ValueError) as e:
+        except (OSError, ValueError) as e:
             logger.warning(f"Could not load auth config: {e}")
 
         self._config = default_config
@@ -301,8 +301,8 @@ def create_application(app_path: Path, base_path: str, app_name: str) -> tornado
 
     # Application settings
     # XSRF cookies intentionally disabled — isolated apps are stateless REST APIs
-    # that authenticate via Bearer tokens (not susceptible to CSRF). NOSONAR
-    settings = {"debug": app_config.get("debug", False), "xsrf_cookies": False}
+    # that authenticate via Bearer tokens (not susceptible to CSRF).
+    settings = {"debug": app_config.get("debug", False), "xsrf_cookies": False}  # NOSONAR
 
     return tornado.web.Application(handlers, **settings)
 

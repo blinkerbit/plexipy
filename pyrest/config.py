@@ -81,18 +81,21 @@ class AppConfigParser:
         if isinstance(tm1_instances, dict):
             self._process_tm1_instances(tm1_instances)
 
+    def _get_tm1_value_string(self, value: Any) -> str:
+        """Convert TM1 config value to string."""
+        if isinstance(value, (dict, list)):
+            return json.dumps(value)
+        elif isinstance(value, bool):
+            return str(value).lower()
+        return str(value)
+
     def _process_single_tm1_instance(self, instance_name: str, instance_config: dict[str, Any]) -> None:
         """Process a single TM1 instance configuration."""
         self._instance_vars[instance_name] = {}
 
         for param, value in instance_config.items():
             # Convert value to string
-            if isinstance(value, (dict, list)):
-                str_value = json.dumps(value)
-            elif isinstance(value, bool):
-                str_value = str(value).lower()
-            else:
-                str_value = str(value)
+            str_value = self._get_tm1_value_string(value)
 
             # Resolve any environment variable references
             resolved_value = self._resolve_value(param, str_value)

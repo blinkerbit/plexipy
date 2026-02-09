@@ -40,16 +40,19 @@ ERR_TM1PY_NOT_INSTALLED = "TM1py is not installed"
 # Thread pool for async TM1 operations (TM1py is blocking)
 TM1_EXECUTOR = ThreadPoolExecutor(max_workers=16)
 
-# TM1py import
+# TM1py import and pyrest utils
 try:
     from TM1py import TM1Service
     from TM1py.Exceptions import TM1pyException
 
-    TM1_AVAILABLE = True
+    from pyrest.utils.tm1 import TM1InstanceConfig, is_tm1_available
+
+    TM1_AVAILABLE = is_tm1_available()
 except ImportError:
     TM1_AVAILABLE = False
     TM1Service = None
     TM1pyException = Exception
+    TM1InstanceConfig = None
 
 
 class TM1QueryBaseHandler(tornado.web.RequestHandler):
@@ -105,141 +108,6 @@ class TM1QueryBaseHandler(tornado.web.RequestHandler):
         loop = tornado.ioloop.IOLoop.current()
         return await loop.run_in_executor(TM1_EXECUTOR, partial(func, *args, **kwargs))
 
-    def _resolve_env(self, value: Any) -> Any:
-        """Resolve environment variables in config values."""
-        if not isinstance(value, str):
-            return value
-        if value.startswith("${") and "}" in value:
-            start = value.find("${")
-            end = value.find("}")
-            env_expr = value[start + 2 : end]
-            if ":-" in env_expr:
-                var_name, default = env_expr.split(":-", 1)
-                result = os.environ.get(var_name.strip(), default)
-            else:
-                result = os.environ.get(env_expr.strip(), "")
-            return value[:start] + result + value[end + 1 :]
-        return value
-
-    def _build_connection_params(self, instance_config: dict[str, Any]) -> dict[str, Any]:
-        """
-        Build TM1Service connection parameters from config.
-
-        Supports TM1 v12 connection types as the primary target:
-        - v12: TM1 v12 with basic authentication
-        - v12_azure_ad: TM1 v12 with Azure AD OAuth2 authentication
-        - v12_paas: IBM Planning Analytics as a Service (TM1 v12)
-
-        Also supports legacy connection types for backward compatibility.
-        """
-        conn_type = self._resolve_env(instance_config.get("connection_type", "v12"))
-
-        # TM1 v12 with basic authentication (primary target)
-        if conn_type.lower() == "v12":
-            params = {
-                "base_url": self._resolve_env(instance_config.get("base_url", "")),
-                "user": self._resolve_env(instance_config.get("user", "")),
-                "password": self._resolve_env(instance_config.get("password", "")),
-                "ssl": self._resolve_env(instance_config.get("ssl", True)),
-            }
-
-            # Optional v12 parameters
-            instance = self._resolve_env(instance_config.get("instance", ""))
-            database = self._resolve_env(instance_config.get("database", ""))
-            if instance:
-                params["instance"] = instance
-            if database:
-                params["database"] = database
-
-            # Handle boolean ssl
-            if isinstance(params["ssl"], str):
-                params["ssl"] = params["ssl"].lower() in ("true", "1", "yes")
-
-            # SSL certificate verification
-            if not self._resolve_env(instance_config.get("verify_ssl_cert", True)):
-                params["verify"] = False
-
-            return params
-
-        # TM1 v12 with Azure AD authentication
-        elif conn_type.lower() == "v12_azure_ad":
-            params = {
-                "base_url": self._resolve_env(instance_config.get("base_url", "")),
-                "tenant": self._resolve_env(instance_config.get("tenant_id", "")),
-                "client_id": self._resolve_env(instance_config.get("client_id", "")),
-                "client_secret": self._resolve_env(instance_config.get("client_secret", "")),
-                "ssl": True,
-            }
-
-            # Custom auth URL if provided
-            auth_url = self._resolve_env(instance_config.get("auth_url", ""))
-            if auth_url:
-                params["auth_url"] = auth_url
-
-            # Optional v12 parameters
-            instance = self._resolve_env(instance_config.get("instance", ""))
-            database = self._resolve_env(instance_config.get("database", ""))
-            if instance:
-                params["instance"] = instance
-            if database:
-                params["database"] = database
-
-            return params
-
-        # TM1 v12 PAaaS (IBM Planning Analytics as a Service)
-        elif conn_type.lower() == "v12_paas":
-            params = {
-                "base_url": self._resolve_env(instance_config.get("base_url", "")),
-                "api_key": self._resolve_env(instance_config.get("api_key", "")),
-                "ssl": True,
-            }
-
-            # IBM IAM URL
-            iam_url = self._resolve_env(instance_config.get("iam_url", ""))
-            if iam_url:
-                params["iam_url"] = iam_url
-
-            # Tenant for PAaaS
-            tenant = self._resolve_env(instance_config.get("tenant", ""))
-            if tenant:
-                params["tenant"] = tenant
-
-            # Optional v12 parameters
-            instance = self._resolve_env(instance_config.get("instance", ""))
-            database = self._resolve_env(instance_config.get("database", ""))
-            if instance:
-                params["instance"] = instance
-            if database:
-                params["database"] = database
-
-            return params
-
-        # Legacy cloud connection
-        elif conn_type.lower() in ("cloud", "paas"):
-            region = self._resolve_env(instance_config.get("cloud_region", ""))
-            tenant = self._resolve_env(instance_config.get("cloud_tenant", ""))
-            return {
-                "base_url": f"https://{region}.planninganalytics.ibmcloud.com/tm1/api/{tenant}/v1",
-                "ipm_url": f"https://{region}.planninganalytics.ibmcloud.com",
-                "api_key": self._resolve_env(instance_config.get("cloud_api_key", "")),
-                "tenant": tenant,
-                "ssl": True,
-            }
-
-        # Legacy on-premise connection (pre-v12)
-        else:
-            params = {
-                "address": self._resolve_env(instance_config.get("server", "localhost")),
-                "port": int(self._resolve_env(instance_config.get("port", 8010))),
-                "ssl": self._resolve_env(instance_config.get("ssl", True)),
-                "user": self._resolve_env(instance_config.get("user", "")),
-                "password": self._resolve_env(instance_config.get("password", "")),
-            }
-            # Handle boolean ssl
-            if isinstance(params["ssl"], str):
-                params["ssl"] = params["ssl"].lower() in ("true", "1", "yes")
-            return params
-
 
 class TM1QueryUIHandler(TM1QueryBaseHandler):
     """Serve the MDX Query UI."""
@@ -276,17 +144,28 @@ class TM1InstancesHandler(TM1QueryBaseHandler):
 
         instances = []
         for name, config in self.tm1_instances.items():
-            conn_type = self._resolve_env(config.get("connection_type", "onprem"))
+            conn_type = TM1InstanceConfig._resolve_env_value(
+                config.get("connection_type", "onprem")
+            )
             instance_info = {
                 "name": name,
                 "description": config.get("description", ""),
                 "connection_type": conn_type,
             }
             if conn_type.lower() in ("cloud", "paas"):
-                instance_info["cloud_region"] = self._resolve_env(config.get("cloud_region", ""))
+                instance_info["cloud_region"] = TM1InstanceConfig._resolve_env_value(
+                    config.get("cloud_region", "")
+                )
             else:
-                instance_info["server"] = self._resolve_env(config.get("server", "localhost"))
-                instance_info["port"] = int(self._resolve_env(config.get("port", 8010)))
+                instance_info["server"] = TM1InstanceConfig._resolve_env_value(
+                    config.get("server", "localhost")
+                )
+                try:
+                    instance_info["port"] = int(
+                        TM1InstanceConfig._resolve_env_value(config.get("port", 8010))
+                    )
+                except (ValueError, TypeError):
+                    instance_info["port"] = 8010
             instances.append(instance_info)
 
         self.success(data={"instances": instances, "tm1py_available": TM1_AVAILABLE})
@@ -306,19 +185,24 @@ class TM1ConnectHandler(TM1QueryBaseHandler):
 
         # Check if using custom connection params or configured instance
         if body.get("custom"):
-            params = {
-                "address": body.get("server", "localhost"),
+            # Create config for custom connection (assuming on-prem)
+            custom_config = {
+                "connection_type": "onprem",
+                "server": body.get("server", "localhost"),
                 "port": int(body.get("port", 8010)),
                 "ssl": body.get("ssl", True),
                 "user": body.get("user", ""),
                 "password": body.get("password", ""),
             }
+            params = TM1InstanceConfig("custom", custom_config).build_connection_params()
         else:
             # Use configured instance
             if instance_name not in self.tm1_instances:
                 self.error(f"Instance '{instance_name}' not configured", 404)
                 return
-            params = self._build_connection_params(self.tm1_instances[instance_name])
+            params = TM1InstanceConfig(
+                instance_name, self.tm1_instances[instance_name]
+            ).build_connection_params()
 
         def _connect_sync(tm1_params):
             """Blocking TM1 connection test."""
@@ -355,18 +239,22 @@ class TM1MDXHandler(TM1QueryBaseHandler):
 
         # Build connection params
         if body.get("custom"):
-            params = {
-                "address": body.get("server", "localhost"),
+            custom_config = {
+                "connection_type": "onprem",
+                "server": body.get("server", "localhost"),
                 "port": int(body.get("port", 8010)),
                 "ssl": body.get("ssl", True),
                 "user": body.get("user", ""),
                 "password": body.get("password", ""),
             }
+            params = TM1InstanceConfig("custom", custom_config).build_connection_params()
         else:
             if instance_name not in self.tm1_instances:
                 self.error(f"Instance '{instance_name}' not configured", 404)
                 return
-            params = self._build_connection_params(self.tm1_instances[instance_name])
+            params = TM1InstanceConfig(
+                instance_name, self.tm1_instances[instance_name]
+            ).build_connection_params()
 
         def _execute_mdx_sync(tm1_params, mdx_query, limit):
             """Blocking MDX execution."""
@@ -426,7 +314,9 @@ class TM1CubesHandler(TM1QueryBaseHandler):
             self.error(f"Instance '{instance_name}' not configured", 404)
             return
 
-        params = self._build_connection_params(self.tm1_instances[instance_name])
+        params = TM1InstanceConfig(
+            instance_name, self.tm1_instances[instance_name]
+        ).build_connection_params()
 
         def _get_cubes_sync(tm1_params):
             """Blocking cube list operation."""

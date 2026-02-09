@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +18,13 @@
             --error: #dc322f;
             --cyan: #2aa198;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: var(--bg);
@@ -25,11 +32,13 @@
             line-height: 1.6;
             min-height: 100vh;
         }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem 1.5rem;
         }
+
         header {
             display: flex;
             justify-content: space-between;
@@ -38,17 +47,23 @@
             padding-bottom: 1.5rem;
             margin-bottom: 2rem;
         }
+
         h1 {
             font-size: 1.5rem;
             font-weight: normal;
             color: var(--fg-bright);
             letter-spacing: 0.05em;
         }
-        h1 span { color: var(--fg-dim); }
+
+        h1 span {
+            color: var(--fg-dim);
+        }
+
         .header-actions {
             display: flex;
             gap: 1rem;
         }
+
         .btn {
             background: var(--bg-alt);
             color: var(--fg);
@@ -59,19 +74,23 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
+
         .btn:hover {
             background: #0a4052;
             color: var(--fg-bright);
             border-color: var(--fg);
         }
+
         .btn.primary {
             border-color: var(--accent);
             color: var(--accent);
         }
+
         .btn.primary:hover {
             background: var(--accent);
             color: var(--bg);
         }
+
         .status-bar {
             display: flex;
             gap: 2rem;
@@ -79,25 +98,30 @@
             background: var(--bg-alt);
             margin-bottom: 2rem;
         }
+
         .stat {
             text-align: center;
         }
+
         .stat-value {
             font-size: 1.5rem;
             color: var(--fg-bright);
         }
+
         .stat-label {
             font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--fg-dim);
         }
+
         .tabs {
             display: flex;
             gap: 0;
             border-bottom: 1px solid var(--bg-alt);
             margin-bottom: 1.5rem;
         }
+
         .tab {
             padding: 0.75rem 1.5rem;
             background: none;
@@ -109,13 +133,24 @@
             border-bottom: 2px solid transparent;
             transition: all 0.15s ease;
         }
-        .tab:hover { color: var(--fg); }
+
+        .tab:hover {
+            color: var(--fg);
+        }
+
         .tab.active {
             color: var(--fg-bright);
             border-bottom-color: var(--accent);
         }
-        .panel { display: none; }
-        .panel.active { display: block; }
+
+        .panel {
+            display: none;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
         h2 {
             font-size: 0.75rem;
             font-weight: normal;
@@ -124,11 +159,13 @@
             color: var(--fg-dim);
             margin-bottom: 1rem;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 2rem;
         }
+
         th {
             text-align: left;
             font-size: 0.7rem;
@@ -139,13 +176,18 @@
             padding: 0.75rem 1rem;
             border-bottom: 1px solid var(--bg-alt);
         }
+
         td {
             padding: 0.75rem 1rem;
             border-bottom: 1px solid var(--bg-alt);
             transition: background 0.15s ease;
             vertical-align: top;
         }
-        tr:hover td { background: var(--bg-alt); }
+
+        tr:hover td {
+            background: var(--bg-alt);
+        }
+
         .badge {
             font-size: 0.65rem;
             padding: 0.2rem 0.5rem;
@@ -153,15 +195,52 @@
             letter-spacing: 0.05em;
             display: inline-block;
         }
-        .badge.loaded { color: var(--success); border: 1px solid var(--success); }
-        .badge.running { color: var(--success); border: 1px solid var(--success); }
-        .badge.stopped { color: var(--warning); border: 1px solid var(--warning); }
-        .badge.failed { color: var(--error); border: 1px solid var(--error); }
-        .badge.embedded { color: var(--fg-dim); border: 1px solid var(--fg-dim); }
-        .badge.isolated { color: var(--accent); border: 1px solid var(--accent); }
-        .badge.healthy { color: var(--success); border: 1px solid var(--success); }
-        .badge.unhealthy { color: var(--error); border: 1px solid var(--error); }
-        .badge.checking { color: var(--fg-dim); border: 1px solid var(--fg-dim); }
+
+        .badge.loaded {
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .badge.running {
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .badge.stopped {
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+
+        .badge.failed {
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .badge.embedded {
+            color: var(--fg-dim);
+            border: 1px solid var(--fg-dim);
+        }
+
+        .badge.isolated {
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+
+        .badge.healthy {
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .badge.unhealthy {
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .badge.checking {
+            color: var(--fg-dim);
+            border: 1px solid var(--fg-dim);
+        }
+
         .health-dot {
             display: inline-block;
             width: 8px;
@@ -170,16 +249,41 @@
             margin-right: 0.4rem;
             vertical-align: middle;
         }
-        .health-dot.green { background: var(--success); }
-        .health-dot.red { background: var(--error); }
-        .health-dot.gray { background: var(--fg-dim); }
-        .health-dot.pulse { animation: pulse 1.5s ease-in-out infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .health-dot.green {
+            background: var(--success);
+        }
+
+        .health-dot.red {
+            background: var(--error);
+        }
+
+        .health-dot.gray {
+            background: var(--fg-dim);
+        }
+
+        .health-dot.pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
         .actions {
             display: flex;
             gap: 0.4rem;
             flex-wrap: wrap;
         }
+
         .action-btn {
             background: none;
             border: 1px solid var(--fg-dim);
@@ -190,67 +294,95 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
+
         .action-btn:hover {
             border-color: var(--fg);
             color: var(--fg);
         }
+
         .action-btn.success:hover {
             border-color: var(--success);
             color: var(--success);
         }
+
         .action-btn.danger:hover {
             border-color: var(--error);
             color: var(--error);
         }
+
         .action-btn.warn:hover {
             border-color: var(--warning);
             color: var(--warning);
         }
+
         .action-btn.primary:hover {
             border-color: var(--accent);
             color: var(--accent);
         }
+
         .action-btn:disabled {
             opacity: 0.3;
             cursor: not-allowed;
         }
+
         /* Process tree & venv info */
         .proc-info {
             font-size: 0.7rem;
             margin-top: 0.3rem;
             color: var(--fg-dim);
         }
-        .proc-info .pid { color: var(--cyan); }
-        .proc-info .workers { color: var(--fg); }
+
+        .proc-info .pid {
+            color: var(--cyan);
+        }
+
+        .proc-info .workers {
+            color: var(--fg);
+        }
+
         .venv-info {
             font-size: 0.7rem;
             color: var(--fg-dim);
         }
-        .venv-info .venv-exists { color: var(--success); }
-        .venv-info .venv-missing { color: var(--warning); }
-        .venv-info .venv-invalid { color: var(--error); }
+
+        .venv-info .venv-exists {
+            color: var(--success);
+        }
+
+        .venv-info .venv-missing {
+            color: var(--warning);
+        }
+
+        .venv-info .venv-invalid {
+            color: var(--error);
+        }
+
         /* Detail row (expandable) */
         .detail-row td {
             padding: 0.5rem 1rem;
             background: rgba(7, 54, 66, 0.8);
             border-bottom: 2px solid var(--bg-alt);
         }
+
         .detail-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 0.5rem;
             font-size: 0.75rem;
         }
+
         .detail-item-label {
             color: var(--fg-dim);
             font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+
         .detail-item-value {
             color: var(--fg-bright);
             word-break: break-all;
         }
+
         .log-container {
             background: var(--bg-alt);
             padding: 1rem;
@@ -258,24 +390,43 @@
             overflow-y: auto;
             font-size: 0.8rem;
         }
+
         .log-entry {
             padding: 0.25rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .log-entry .time { color: var(--fg-dim); }
-        .log-entry .level { margin: 0 0.5rem; }
-        .log-entry .level.info { color: var(--accent); }
-        .log-entry .level.warn { color: var(--warning); }
-        .log-entry .level.error { color: var(--error); }
+
+        .log-entry .time {
+            color: var(--fg-dim);
+        }
+
+        .log-entry .level {
+            margin: 0 0.5rem;
+        }
+
+        .log-entry .level.info {
+            color: var(--accent);
+        }
+
+        .log-entry .level.warn {
+            color: var(--warning);
+        }
+
+        .log-entry .level.error {
+            color: var(--error);
+        }
+
         .config-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 1rem;
         }
+
         .config-item {
             background: var(--bg-alt);
             padding: 1rem;
         }
+
         .config-key {
             font-size: 0.7rem;
             text-transform: uppercase;
@@ -283,15 +434,18 @@
             color: var(--fg-dim);
             margin-bottom: 0.25rem;
         }
+
         .config-value {
             color: var(--fg-bright);
             word-break: break-all;
         }
+
         .empty {
             text-align: center;
             padding: 3rem;
             color: var(--fg-dim);
         }
+
         .spinner {
             display: inline-block;
             width: 16px;
@@ -301,7 +455,13 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -316,28 +476,49 @@
             z-index: 1000;
             max-width: 400px;
         }
+
         .toast.show {
             opacity: 1;
             transform: translateY(0);
         }
-        .toast.success { border-color: var(--success); }
-        .toast.error { border-color: var(--error); }
+
+        .toast.success {
+            border-color: var(--success);
+        }
+
+        .toast.error {
+            border-color: var(--error);
+        }
+
         .fade-in {
             animation: fadeIn 0.3s ease-out forwards;
             opacity: 0;
         }
-        @keyframes fadeIn { to { opacity: 1; } }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
         /* Confirm dialog */
         .modal-overlay {
             display: none;
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6);
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
             z-index: 999;
             justify-content: center;
             align-items: center;
         }
-        .modal-overlay.show { display: flex; }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
         .modal-box {
             background: var(--bg-alt);
             border: 1px solid var(--fg-dim);
@@ -345,16 +526,19 @@
             max-width: 400px;
             width: 90%;
         }
+
         .modal-box h3 {
             color: var(--fg-bright);
             font-size: 1rem;
             font-weight: normal;
             margin-bottom: 1rem;
         }
+
         .modal-box p {
             margin-bottom: 1.5rem;
             font-size: 0.85rem;
         }
+
         .modal-actions {
             display: flex;
             gap: 0.5rem;
@@ -362,6 +546,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header class="fade-in">
@@ -418,7 +603,9 @@
                     </tr>
                 </thead>
                 <tbody id="apps-tbody">
-                    <tr><td colspan="6" class="empty"><span class="spinner"></span> Loading...</td></tr>
+                    <tr>
+                        <td colspan="6" class="empty"><span class="spinner"></span> Loading...</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -461,10 +648,10 @@
         // =====================================================================
         // Tab switching
         // =====================================================================
-        document.querySelectorAll('.tab').forEach(function(tab) {
-            tab.addEventListener('click', function() {
-                document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-                document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+        document.querySelectorAll('.tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+                document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
                 tab.classList.add('active');
                 document.getElementById(tab.dataset.panel).classList.add('active');
             });
@@ -477,7 +664,7 @@
             var toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast ' + (type || '') + ' show';
-            setTimeout(function() { toast.classList.remove('show'); }, 4000);
+            setTimeout(function () { toast.classList.remove('show'); }, 4000);
         }
 
         function addLog(level, message) {
@@ -493,7 +680,7 @@
                 container.innerHTML = '<div class="empty">No logs available</div>';
                 return;
             }
-            container.innerHTML = logs.map(function(log) {
+            container.innerHTML = logs.map(function (log) {
                 return '<div class="log-entry">' +
                     '<span class="time">' + log.time + '</span>' +
                     '<span class="level ' + log.level + '">[' + log.level.toUpperCase() + ']</span>' +
@@ -528,29 +715,29 @@
         // =====================================================================
         function checkHealth(url, timeout) {
             timeout = timeout || 3000;
-            return new Promise(function(resolve) {
+            return new Promise(function (resolve) {
                 var controller = new AbortController();
-                var timer = setTimeout(function() {
+                var timer = setTimeout(function () {
                     controller.abort();
                     resolve({ healthy: false, error: 'timeout', latency: timeout });
                 }, timeout);
 
                 var start = Date.now();
                 fetch(url, { signal: controller.signal })
-                    .then(function(r) {
+                    .then(function (r) {
                         clearTimeout(timer);
                         var latency = Date.now() - start;
                         if (r.ok) {
-                            return r.json().then(function(data) {
+                            return r.json().then(function (data) {
                                 resolve({ healthy: true, latency: latency, data: data });
-                            }).catch(function() {
+                            }).catch(function () {
                                 resolve({ healthy: true, latency: latency, data: {} });
                             });
                         } else {
                             resolve({ healthy: false, error: 'HTTP ' + r.status, latency: latency });
                         }
                     })
-                    .catch(function(e) {
+                    .catch(function (e) {
                         clearTimeout(timer);
                         var latency = Date.now() - start;
                         resolve({ healthy: false, error: e.message, latency: latency });
@@ -581,7 +768,7 @@
 
         function loadStatus() {
             // Check framework health
-            checkHealth('/pyrest/health').then(function(result) {
+            checkHealth('/pyrest/health').then(function (result) {
                 var el = document.getElementById('framework-health');
                 if (result.healthy) {
                     el.innerHTML = '<span style="color: var(--success);">OK</span>';
@@ -592,11 +779,11 @@
 
             // Load app status from admin API
             fetch(API_BASE + '/status')
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
                     if (data.success) renderStatus(data.data);
                 })
-                .catch(function(e) {
+                .catch(function (e) {
                     addLog('error', 'Failed to load status: ' + e.message);
                 });
         }
@@ -640,16 +827,16 @@
 
         function renderIsolatedActions(name, isRunning, venv) {
             var venvExists = venv && venv.exists;
-            var venvValid = venv && venv.valid;
+
 
             // Row 1: App lifecycle
             var html = '<div class="actions" style="margin-bottom:0.3rem;">';
             html += '<button class="action-btn success" onclick="controlApp(\'' + name + '\', \'start\')"' +
                 (isRunning ? ' disabled title="Already running"' : '') + '>Start</button>';
             html += '<button class="action-btn danger" onclick="controlApp(\'' + name + '\', \'stop\')"' +
-                (!isRunning ? ' disabled title="Not running"' : '') + '>Stop</button>';
+                (isRunning ? '' : ' disabled title="Not running"') + '>Stop</button>';
             html += '<button class="action-btn" onclick="controlApp(\'' + name + '\', \'restart\')"' +
-                (!isRunning ? ' disabled title="Not running"' : '') + '>Restart</button>';
+                (isRunning ? '' : ' disabled title="Not running"') + '>Restart</button>';
             html += '</div>';
 
             // Row 2: Venv lifecycle
@@ -657,7 +844,7 @@
             html += '<button class="action-btn success" onclick="confirmCreateVenv(\'' + name + '\')"' +
                 (venvExists ? ' disabled title=".venv already exists"' : '') + '>Create .venv</button>';
             html += '<button class="action-btn danger" onclick="confirmDeleteVenv(\'' + name + '\')"' +
-                (!venvExists ? ' disabled title="No .venv to delete"' : '') + '>Delete .venv</button>';
+                (venvExists ? '' : ' disabled title="No .venv to delete"') + '>Delete .venv</button>';
             html += '<button class="action-btn primary" onclick="confirmRebuild(\'' + name + '\')">Rebuild .venv</button>';
             html += '</div>';
             return html;
@@ -682,7 +869,7 @@
             var allApps = [];
 
             // Embedded apps
-            embedded.forEach(function(app) {
+            embedded.forEach(function (app) {
                 var healthId = 'health-' + app.name;
                 allApps.push({ name: app.name, prefix: app.prefix, type: 'embedded' });
 
@@ -697,12 +884,10 @@
             });
 
             // Isolated apps
-            isolated.forEach(function(app) {
+            isolated.forEach(function (app) {
                 var isRunning = false;
                 var proc = app.process || null;
-                if (proc && proc.running) {
-                    isRunning = true;
-                } else if (app.running === true) {
+                if ((proc && proc.running) || app.running === true) {
                     isRunning = true;
                 }
 
@@ -715,7 +900,7 @@
 
                 rows.push('<tr>' +
                     '<td><strong>' + app.name + '</strong>' +
-                        '<br><span style="color:var(--fg-dim);font-size:0.7rem;">' + app.prefix + ' :' + app.port + '</span></td>' +
+                    '<br><span style="color:var(--fg-dim);font-size:0.7rem;">' + app.prefix + ' :' + app.port + '</span></td>' +
                     '<td><span class="badge isolated">isolated</span></td>' +
                     '<td>' + statusBadge + renderProcessInfo(proc, app.name) + '</td>' +
                     '<td>' + renderVenvInfo(app.venv, app.name) + '</td>' +
@@ -725,7 +910,7 @@
             });
 
             // Failed apps
-            failed.forEach(function(app) {
+            failed.forEach(function (app) {
                 var errShort = (app.error || 'Error').substring(0, 60);
                 rows.push('<tr>' +
                     '<td><strong>' + app.name + '</strong></td>' +
@@ -748,8 +933,8 @@
             var checkedCount = 0;
             var totalToCheck = allApps.length;
 
-            allApps.forEach(function(app) {
-                checkHealth(app.prefix + '/health').then(function(result) {
+            allApps.forEach(function (app) {
+                checkHealth(app.prefix + '/health').then(function (result) {
                     healthCache[app.name] = result;
                     checkedCount++;
 
@@ -761,8 +946,13 @@
                     if (checkedCount >= totalToCheck) {
                         var countEl = document.getElementById('healthy-count');
                         countEl.textContent = healthyCount + '/' + totalToCheck;
-                        countEl.style.color = healthyCount === totalToCheck ? 'var(--success)' :
-                            (healthyCount > 0 ? 'var(--warning)' : 'var(--error)');
+                        if (healthyCount === totalToCheck) {
+                            countEl.style.color = 'var(--success)';
+                        } else if (healthyCount > 0) {
+                            countEl.style.color = 'var(--warning)';
+                        } else {
+                            countEl.style.color = 'var(--error)';
+                        }
                     }
                 });
             });
@@ -777,11 +967,11 @@
         // =====================================================================
         function loadConfig() {
             fetch(API_BASE + '/config')
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
                     if (data.success) renderConfig(data.data);
                 })
-                .catch(function(e) {
+                .catch(function (e) {
                     addLog('error', 'Failed to load config: ' + e.message);
                 });
         }
@@ -810,7 +1000,7 @@
             showToast(action + ' ' + name + '...', '');
 
             fetch(API_BASE + '/apps/' + name + '/' + action, { method: 'POST' })
-                .then(function(r) {
+                .then(function (r) {
                     if (r.status === 401 || r.status === 403) {
                         showToast('Authorization required. Please log in first.', 'error');
                         addLog('error', name + ' ' + action + ': not authorized (HTTP ' + r.status + ')');
@@ -818,7 +1008,7 @@
                     }
                     return r.json();
                 })
-                .then(function(data) {
+                .then(function (data) {
                     if (!data) return; // auth error already handled
                     if (data.success) {
                         var msg = data.message || (action + ' successful');
@@ -844,7 +1034,7 @@
                     // Reload status after delay
                     setTimeout(loadStatus, 2000);
                 })
-                .catch(function(e) {
+                .catch(function (e) {
                     showToast('Error: ' + e.message, 'error');
                     addLog('error', 'Request failed: ' + e.message);
                 });
@@ -861,8 +1051,11 @@
 
         function refreshProcesses(name) {
             fetch(API_BASE + '/apps/' + name + '/processes', { method: 'POST' })
-                .then(function(r) { if (handleAuthError(r)) return null; return r.json(); })
-                .then(function(data) {
+                .then(function (r) {
+                    if (handleAuthError(r)) { return null; }
+                    return r.json();
+                })
+                .then(function (data) {
                     if (!data) return;
                     if (data.success) {
                         var d = data.data;
@@ -876,32 +1069,36 @@
                         showToast('Error: ' + (data.error || 'Unknown'), 'error');
                     }
                 })
-                .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+                .catch(function (e) { showToast('Error: ' + e.message, 'error'); });
         }
 
         function refreshVenvStatus(name) {
             fetch(API_BASE + '/apps/' + name + '/venv-status', { method: 'POST' })
-                .then(function(r) { if (handleAuthError(r)) return null; return r.json(); })
-                .then(function(data) {
+                .then(function (r) {
+                    if (handleAuthError(r)) { return null; }
+                    return r.json();
+                })
+                .then(function (data) {
                     if (!data) return;
                     if (data.success) {
-                        addLog('info', name + ': venv ' + (data.data.exists ? (data.data.valid ? 'ready' : 'invalid') : 'missing') +
+                        var status = data.data.exists ? (data.data.valid ? 'ready' : 'invalid') : 'missing';
+                        addLog('info', name + ': venv ' + status +
                             (data.data.size_mb ? ' (' + data.data.size_mb + ' MB)' : ''));
-                        showToast(name + ' venv: ' + (data.data.exists ? (data.data.valid ? 'ready' : 'invalid') : 'missing'), 'success');
+                        showToast(name + ' venv: ' + status, 'success');
                         // Refresh full status to update the row
                         setTimeout(loadStatus, 500);
                     } else {
                         showToast('Error: ' + (data.error || 'Unknown'), 'error');
                     }
                 })
-                .catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+                .catch(function (e) { showToast('Error: ' + e.message, 'error'); });
         }
 
         function confirmDeleteVenv(name) {
             showConfirm(
                 'Delete .venv',
                 'This will stop "' + name + '" (if running) and delete its .venv directory. The app cannot run until a new .venv is created.',
-                function() { controlApp(name, 'clear-venv'); }
+                function () { controlApp(name, 'clear-venv'); }
             );
         }
 
@@ -909,7 +1106,7 @@
             showConfirm(
                 'Create .venv',
                 'This will create a fresh virtual environment for "' + name + '" and install its dependencies. The app will NOT be started automatically.',
-                function() { controlApp(name, 'create-venv'); }
+                function () { controlApp(name, 'create-venv'); }
             );
         }
 
@@ -917,14 +1114,14 @@
             showConfirm(
                 'Rebuild .venv',
                 'This will stop "' + name + '", delete .venv, create a fresh one, install dependencies, and restart the app. This may take a minute.',
-                function() { controlApp(name, 'rebuild-venv'); }
+                function () { controlApp(name, 'rebuild-venv'); }
             );
         }
 
         // =====================================================================
         // Initial load
         // =====================================================================
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             addLog('info', 'Admin dashboard loaded');
             loadStatus();
             loadConfig();
@@ -934,4 +1131,5 @@
         });
     </script>
 </body>
+
 </html>

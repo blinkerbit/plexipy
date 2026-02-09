@@ -17,10 +17,7 @@ DEFAULT_VENV_NAME = ".venv"
 logger = logging.getLogger("pyrest.venv_manager")
 
 
-async def _run_cmd(
-    *args: str,
-    timeout: float = 300,
-) -> tuple[int, str, str]:
+async def _run_cmd(*args: str) -> tuple[int, str, str]:
     """
     Run a command asynchronously and return (returncode, stdout, stderr).
     All subprocess operations go through this single helper.
@@ -31,12 +28,11 @@ async def _run_cmd(
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        async with asyncio.timeout(timeout):
-            stdout_bytes, stderr_bytes = await proc.communicate()
-    except TimeoutError:
+        stdout_bytes, stderr_bytes = await proc.communicate()
+    except asyncio.CancelledError:
         proc.kill()
         await proc.wait()
-        return -1, "", f"Command timed out after {timeout}s: {' '.join(args)}"
+        raise
 
     return (
         proc.returncode or 0,
@@ -165,12 +161,15 @@ class VenvManager:
         try:
             if os.access(self._setup_pip_script, os.X_OK):
                 # Script is executable, try running it
-                rc, stdout, _ = await _run_cmd(
-                    "bash",
-                    "-c",
-                    f"source {self._setup_pip_script} && env",
-                    timeout=10,
-                )
+                try:
+                    async with asyncio.timeout(10):
+                        rc, stdout, _ = await _run_cmd(
+                            "bash",
+                            "-c",
+                            f"source {self._setup_pip_script} && env",
+                        )
+                except TimeoutError:
+                    rc, stdout = -1, ""
                 if rc == 0:
                     self._apply_env_vars(stdout.splitlines())
             else:
@@ -195,23 +194,25 @@ class VenvManager:
 
             await self._load_pip_env()
 
-            if self._uv_available:
-                rc, stdout, stderr = await _run_cmd(
-                    "uv",
-                    "venv",
-                    str(venv_path),
-                    "--python",
-                    sys.executable,
-                    timeout=60,
-                )
-            else:
-                rc, stdout, stderr = await _run_cmd(
-                    sys.executable,
-                    "-m",
-                    "venv",
-                    str(venv_path),
-                    timeout=60,
-                )
+            try:
+                async with asyncio.timeout(60):
+                    if self._uv_available:
+                        rc, stdout, stderr = await _run_cmd(
+                            "uv",
+                            "venv",
+                            str(venv_path),
+                            "--python",
+                            sys.executable,
+                        )
+                    else:
+                        rc, stdout, stderr = await _run_cmd(
+                            sys.executable,
+                            "-m",
+                            "venv",
+                            str(venv_path),
+                        )
+            except TimeoutError:
+                rc, stdout, stderr = -1, "", "Command timed out"
 
             if stdout:
                 logger.info(f"venv creation stdout:\n{stdout}")
@@ -236,16 +237,19 @@ class VenvManager:
     ) -> tuple[int, str, str]:
         """Install requirements using uv."""
         logger.info("Installing packages using uv...")
-        return await _run_cmd(
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            str(self.get_python_executable(venv_path)),
-            "-r",
-            str(requirements_file),
-            timeout=300,
-        )
+        try:
+            async with asyncio.timeout(300):
+                return await _run_cmd(
+                    "uv",
+                    "pip",
+                    "install",
+                    "--python",
+                    str(self.get_python_executable(venv_path)),
+                    "-r",
+                    str(requirements_file),
+                )
+        except TimeoutError:
+            return -1, "", "Installation timed out"
 
     async def _install_with_pip(
         self, venv_path: Path, requirements_file: Path
@@ -255,26 +259,33 @@ class VenvManager:
         logger.info("Upgrading pip...")
         
         # Upgrade pip first
-        up_rc, up_out, up_err = await _run_cmd(
-            str(pip_exe),
-            "install",
-            "--upgrade",
-            "pip",
-            timeout=60,
-        )
+        try:
+            async with asyncio.timeout(60):
+                up_rc, up_out, up_err = await _run_cmd(
+                    str(pip_exe),
+                    "install",
+                    "--upgrade",
+                    "pip",
+                )
+        except TimeoutError:
+            up_rc, up_out, up_err = -1, "", "pip upgrade timed out"
+
         if up_rc != 0:
             logger.warning(f"pip upgrade failed: {up_err}")
         else:
             logger.info(f"pip upgraded: {up_out.strip()}")
 
         logger.info("Installing packages using pip...")
-        return await _run_cmd(
-            str(pip_exe),
-            "install",
-            "-r",
-            str(requirements_file),
-            timeout=300,
-        )
+        try:
+            async with asyncio.timeout(300):
+                return await _run_cmd(
+                    str(pip_exe),
+                    "install",
+                    "-r",
+                    str(requirements_file),
+                )
+        except TimeoutError:
+            return -1, "", "Installation timed out"
 
     async def install_requirements(
         self, venv_path: Path, requirements_file: Path
