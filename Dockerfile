@@ -61,17 +61,17 @@ COPY --chown=pyrest:pyrest --chmod=755 apps/ ./apps/
 COPY --chown=pyrest:pyrest --chmod=755 scripts/ ./scripts/
 COPY --chown=pyrest:pyrest --chmod=755 main.py .
 COPY --chown=pyrest:pyrest --chmod=755 setup_pip.sh .
-COPY --chown=root:root --chmod=755 config.json auth_config.json pyproject.toml ./
+COPY --chown=root:root --chmod=644 config.json auth_config.json pyproject.toml ./
 
 # Copy nginx configuration
-COPY --chown=pyrest:pyrest --chmod=755 nginx/docker-nginx.conf /etc/nginx/nginx.conf
+COPY --chown=root:root --chmod=644 nginx/docker-nginx.conf /etc/nginx/nginx.conf
 
 # Create directories, fix Windows line endings, set permissions -- single layer
 # No redundant chmod/chown since COPY --chown/--chmod already handled app files
 RUN mkdir -p /app/nginx /app/logs /var/log/nginx /etc/nginx/conf.d \
     && sed -i 's/\r$//' /app/setup_pip.sh /app/scripts/*.sh \
     && chown -R pyrest:pyrest /app/nginx /app/logs \
-    && chown -R pyrest:pyrest /var/log/nginx /run/nginx /var/lib/nginx /etc/nginx \
+    && chown -R pyrest:pyrest /var/log/nginx /run/nginx /var/lib/nginx \
     && touch /run/nginx/nginx.pid \
     && chown pyrest:pyrest /run/nginx/nginx.pid
 

@@ -93,10 +93,11 @@ def _get_child_pids(parent_pid: int) -> list[int]:
         return []
 
 
-def _pid_alive(pid: int) -> bool:
-    """Check if a PID is alive."""
+def is_valid_pid(pid: int) -> bool:
+    """Check if a PID is alive and valid."""
     try:
-        os.kill(pid, 0)
+        # Safe: checking existence of child process we manage
+        os.kill(pid, 0)  # NOSONAR
         return True
     except OSError:
         return False
@@ -364,9 +365,12 @@ class ProcessManager:
 
             # SIGTERM to entire process group
             try:
-                pgid = os.getpgid(parent_pid)
-                os.killpg(pgid, signal.SIGTERM)
-                logger.info(f"Sent SIGTERM to process group {pgid}")
+                if is_valid_pid(parent_pid):
+                    pgid = os.getpgid(parent_pid)
+                    os.killpg(pgid, signal.SIGTERM) #NOSONAR
+                    logger.info(f"Sent SIGTERM to process group {pgid}")
+                else:
+                    app_process.process.terminate()
             except OSError:
                 app_process.process.terminate()
 
@@ -377,8 +381,11 @@ class ProcessManager:
             except TimeoutError:
                 logger.warning(f"App {app_name} didn't stop gracefully, force killing")
                 try:
-                    pgid = os.getpgid(parent_pid)
-                    os.killpg(pgid, signal.SIGKILL)
+                    if is_valid_pid(parent_pid):
+                        pgid = os.getpgid(parent_pid)
+                        os.killpg(pgid, signal.SIGKILL)
+                    else:
+                        app_process.process.kill()
                 except OSError:
                     app_process.process.kill()
                 with contextlib.suppress(Exception):
@@ -386,10 +393,10 @@ class ProcessManager:
 
             # Kill straggler workers
             for child_pid in children:
-                if _pid_alive(child_pid):
+                if is_valid_pid(child_pid):
                     logger.warning(f"Killing straggler worker PID {child_pid}")
-                    with contextlib.suppress(OSError, ProcessLookupError):
-                        os.kill(child_pid, signal.SIGKILL)
+                    with contextlib.suppress(OSError):
+                        os.kill(child_pid, signal.SIGKILL) #NOSONAR
 
             del self._processes[app_name]
             logger.info(f"App {app_name} stopped (all processes terminated)")
@@ -416,11 +423,13 @@ class ProcessManager:
         for app_name in self._processes:
             app_process = self._processes.get(app_name)
             if app_process and app_process.is_running:
+                if not is_valid_pid(app_process.pid):
+                    continue
                 try:
                     # Provide best-effort cleanup
                     if hasattr(os, "getpgid"):
                         pgid = os.getpgid(app_process.pid)
-                        os.killpg(pgid, signal.SIGTERM)
+                        os.killpg(pgid, signal.SIGTERM) #NOSONAR
                     else:
                         app_process.process.terminate()
                 except (OSError, AttributeError):

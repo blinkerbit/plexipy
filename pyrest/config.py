@@ -68,7 +68,7 @@ class AppConfigParser:
         for key, value in self.config_data.items():
             if key not in self.RESERVED_KEYS:
                 # Check if value should be resolved from environment
-                resolved_value = self._resolve_value(key, value)
+                resolved_value = self._resolve_value(value)
                 self._resolved_config[key] = resolved_value
 
         # Process os_vars section
@@ -98,7 +98,7 @@ class AppConfigParser:
             str_value = self._get_tm1_value_string(value)
 
             # Resolve any environment variable references
-            resolved_value = self._resolve_value(param, str_value)
+            resolved_value = self._resolve_value(str_value)
             if isinstance(resolved_value, str):
                 str_value = resolved_value
             elif isinstance(resolved_value, bool):
@@ -142,13 +142,13 @@ class AppConfigParser:
 
         # Also store the resolved tm1_instances in the config
         self._resolved_config["tm1_instances"] = {
-            name: {k: self._resolve_value(k, v) for k, v in config.items()}
+            name: {k: self._resolve_value(v) for k, v in config.items()}
             for name, config in tm1_instances.items()
         }
 
         logger.info(f"Processed {len(tm1_instances)} TM1 instances for app '{self.app_name}'")
 
-    def _resolve_value(self, key: str, value: Any) -> Any:
+    def _resolve_value(self, value: Any) -> Any:
         """
         Resolve a configuration value.
 
@@ -163,9 +163,9 @@ class AppConfigParser:
                 var_name = value[1:]
                 return os.environ.get(var_name, value)
         elif isinstance(value, dict):
-            return {k: self._resolve_value(k, v) for k, v in value.items()}
+            return {k: self._resolve_value(v) for k, v in value.items()}
         elif isinstance(value, list):
-            return [self._resolve_value(str(i), v) for i, v in enumerate(value)]
+            return [self._resolve_value(v) for v in value]
         return value
 
     def _resolve_env_reference(self, value: str) -> str:
