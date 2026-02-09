@@ -9,6 +9,7 @@ from pathlib import Path
 
 import tornado.httpserver
 import tornado.ioloop
+import tornado.template
 import tornado.web
 
 from .admin import get_admin_handlers
@@ -57,8 +58,8 @@ class IndexHandler(BaseHandler):
                 isolated_apps=isolated_apps,
                 failed_apps=failed_objs,
             )
-        except Exception as e:
-            logger.warning(f"Template rendering failed, returning JSON: {e}")
+        except (OSError, tornado.template.ParseError, NameError, KeyError) as e:
+            logger.warning("Template rendering failed, returning JSON: %s", e)
             self.success(
                 data={
                     "name": "PyRest API Framework",
@@ -203,7 +204,13 @@ class PyRestApplication(tornado.web.Application):
         app_settings = {
             "debug": self.framework_config.debug,
             "cookie_secret": os.environ.get("PYREST_COOKIE_SECRET", secrets.token_hex(32)),
-            "xsrf_cookies": False,  # Disabled for API usage
+            # XSRF cookies are intentionally disabled (NOSONAR).
+            # PyRest is a stateless REST API that authenticates via Bearer tokens
+            # in the Authorization header, which is not susceptible to CSRF attacks.
+            # See OWASP: "If your application uses token-based authentication where
+            # the token is not automatically submitted by the browser, CSRF is not
+            # a concern."
+            "xsrf_cookies": False,
             **settings,
         }
 
@@ -319,9 +326,9 @@ class PyRestApplication(tornado.web.Application):
                             f"Isolated app '{app_config.name}' spawned on port {app_config.port}"
                         )
                         success_count += 1
-                except Exception as e:
+                except (OSError, ValueError) as e:
                     error_msg = f"Error spawning process: {e}"
-                    logger.exception(f"Error spawning isolated app {app_config.name}: {e}")
+                    logger.exception("Error spawning isolated app %s: %s", app_config.name, e)
                     self.app_loader.failed_apps[app_config.name] = {
                         "name": app_config.name,
                         "path": str(app_config.path),
@@ -332,9 +339,9 @@ class PyRestApplication(tornado.web.Application):
                     }
                     self.app_loader.isolated_apps.pop(app_config.name, None)
 
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 error_msg = f"Unexpected error during setup: {e}"
-                logger.exception(f"Unexpected error setting up {app_config.name}: {e}")
+                logger.exception("Unexpected error setting up %s: %s", app_config.name, e)
                 self.app_loader.failed_apps[app_config.name] = {
                     "name": app_config.name,
                     "path": str(app_config.path),
@@ -367,8 +374,8 @@ class PyRestApplication(tornado.web.Application):
                 embedded_apps=embedded_apps,
                 isolated_apps=isolated_apps,
             )
-        except Exception as e:
-            logger.exception(f"Failed to generate nginx configuration: {e}")
+        except (OSError, ValueError) as e:
+            logger.exception("Failed to generate nginx configuration: %s", e)
             return None
 
 
@@ -421,8 +428,8 @@ def run_server(
                     logger.info(f"Nginx configuration generated: {nginx_config}")
                 else:
                     logger.warning("Nginx configuration generation failed (continuing)")
-            except Exception as e:
-                logger.exception(f"Nginx generation error: {e}")
+            except (OSError, ValueError) as e:
+                logger.exception("Nginx generation error: %s", e)
                 logger.warning("Server will continue without nginx configuration")
 
         io_loop.run_sync(_gen_nginx)

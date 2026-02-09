@@ -90,12 +90,12 @@ class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):
         assert "embedded_apps" in data["data"]
         assert "isolated_apps" in data["data"]
 
-    def test_cors_headers(self):
-        """Should include CORS headers."""
+    def test_cors_headers_not_sent_by_default(self):
+        """CORS headers should NOT be sent when cors_origins is empty (S5122)."""
         response = self.fetch(f"{BASE_PATH}/health")
 
-        assert "Access-Control-Allow-Origin" in response.headers
-        assert "Access-Control-Allow-Methods" in response.headers
+        # Default cors_origins is now [] — no CORS headers should be set
+        assert "Access-Control-Allow-Origin" not in response.headers
 
     def test_options_request(self):
         """Should handle CORS preflight requests."""
@@ -163,8 +163,17 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
 
                         return create_app()
 
-    def test_register_user(self):
-        """Should register new user."""
+    def _get_admin_token(self) -> str:
+        """Seed a bootstrap admin user and return a JWT token."""
+        from pyrest.auth import get_auth_manager
+
+        mgr = get_auth_manager()
+        mgr.register_user("admin", "adminpass")
+        token = mgr.authenticate_user("admin", "adminpass")
+        return token
+
+    def test_register_requires_auth(self):
+        """Registration should require a valid JWT (S4834)."""
         response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
@@ -174,19 +183,42 @@ class TestAuthIntegration(tornado.testing.AsyncHTTPTestCase):
             headers={"Content-Type": "application/json"},
         )
 
+        assert response.code == 401
+
+    def test_register_user_with_auth(self):
+        """Should register new user when caller has valid JWT."""
+        token = self._get_admin_token()
+
+        response = self.fetch(
+            f"{BASE_PATH}/auth/register",
+            method="POST",
+            body=json.dumps(
+                {"username": "testuser", "password": "testpass", "email": "test@example.com"}
+            ),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+        )
+
         assert response.code == 201
 
         data = json.loads(response.body)
         assert data["success"] is True
         assert data["data"]["username"] == "testuser"
 
-    def test_register_missing_fields(self):
-        """Should reject registration with missing fields."""
+    def test_register_missing_fields_with_auth(self):
+        """Should reject registration with missing fields (even with valid JWT)."""
+        token = self._get_admin_token()
+
         response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
             body=json.dumps({"username": "testuser"}),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
         )
 
         assert response.code == 400
@@ -267,17 +299,27 @@ class TestFullWorkflow(tornado.testing.AsyncHTTPTestCase):
                         return create_app()
 
     def test_register_login_access_flow(self):
-        """Test complete user flow: register -> login -> access protected."""
-        # 1. Register
+        """Test complete user flow: bootstrap admin -> register user -> login -> access protected."""
+        from pyrest.auth import get_auth_manager
+
+        # 0. Seed a bootstrap admin directly (simulates initial setup / CLI provisioning)
+        mgr = get_auth_manager()
+        mgr.register_user("admin", "adminpass")
+        admin_token = mgr.authenticate_user("admin", "adminpass")
+
+        # 1. Register a new user via the API (now requires auth)
         register_response = self.fetch(
             f"{BASE_PATH}/auth/register",
             method="POST",
             body=json.dumps({"username": "flowuser", "password": "flowpass"}),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {admin_token}",
+            },
         )
         assert register_response.code == 201
 
-        # 2. Login
+        # 2. Login as the new user
         login_response = self.fetch(
             f"{BASE_PATH}/auth/login",
             method="POST",

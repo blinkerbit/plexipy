@@ -62,7 +62,7 @@ class AuthConfig:
                     file_config = json.load(f)
                     default_config.update(file_config)
             except (OSError, json.JSONDecodeError) as e:
-                logger.warning(f"Could not load {config_file}: {e}")
+                logger.warning("Could not load %s: %s", config_file, e)
 
         # Also check environment variables as fallback
         env = get_env()
@@ -137,11 +137,25 @@ class JWTAuth:
     JWT-based authentication handler.
     """
 
+    #: Minimum recommended key length for HMAC-SHA256 (bytes)
+    _MIN_SECRET_LENGTH = 32
+
     def __init__(self):
         self.auth_config = get_auth_config()
         self.secret = self.auth_config.jwt_secret
         self.expiry_hours = self.auth_config.jwt_expiry_hours
         self.algorithm = self.auth_config.jwt_algorithm
+
+        # S2068 / S5527: warn about weak or missing secrets at startup
+        if not self.secret:
+            logger.warning(
+                "JWT secret is empty — set PYREST_JWT_SECRET env var before production use"
+            )
+        elif len(self.secret) < self._MIN_SECRET_LENGTH:
+            logger.warning(
+                "JWT secret is shorter than %d bytes — consider using a stronger key",
+                self._MIN_SECRET_LENGTH,
+            )
 
     def generate_token(self, payload: dict[str, Any]) -> str:
         """Generate a JWT token with the given payload."""
@@ -307,7 +321,7 @@ class AzureADAuth:
             user_info = await self.get_user_info(token)
 
             return {"valid": True, "user": user_info, "token_claims": unverified}
-        except Exception as e:
+        except (AuthError, jwt.InvalidTokenError, tornado.httpclient.HTTPError) as e:
             raise AuthError(f"Token validation failed: {e!s}") from e
 
     def decode_token_claims(self, token: str) -> dict[str, Any]:

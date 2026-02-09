@@ -28,7 +28,12 @@ class BaseHandler(tornado.web.RequestHandler):
         self._current_user = None
 
     def set_default_headers(self):
-        """Set default headers including CORS if enabled."""
+        """Set default headers including CORS if enabled.
+
+        CORS origins must be explicitly configured via PYREST_CORS_ORIGINS env var
+        or cors_origins in config.json.  The default is empty (no CORS headers),
+        which is the secure default per SonarQube S5122.
+        """
         self.set_header("Content-Type", "application/json")
 
         # Ensure framework_config is available (set_default_headers runs before initialize)
@@ -36,11 +41,19 @@ class BaseHandler(tornado.web.RequestHandler):
             self.framework_config = get_config()
 
         if self.framework_config.get("cors_enabled", True):
-            origin = self.request.headers.get("Origin", "*")
-            allowed_origins = self.framework_config.get("cors_origins", ["*"])
+            origin = self.request.headers.get("Origin", "")
+            allowed_origins = self.framework_config.get("cors_origins", [])
 
-            if "*" in allowed_origins or origin in allowed_origins:
+            if not origin or not allowed_origins:
+                return
+
+            if origin in allowed_origins:
                 self.set_header("Access-Control-Allow-Origin", origin)
+            elif "*" in allowed_origins:
+                # Wildcard CORS: only set if explicitly configured
+                self.set_header("Access-Control-Allow-Origin", origin)
+            else:
+                return  # Origin not allowed - do not set CORS headers
 
             self.set_header(
                 "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS"
@@ -171,10 +184,11 @@ class AuthLoginHandler(BaseHandler):
 
 
 class AuthRegisterHandler(BaseHandler):
-    """User registration endpoint."""
+    """User registration endpoint (requires authentication - S4834)."""
 
+    @authenticated
     async def post(self):
-        """Register a new user."""
+        """Register a new user (admin-only: requires valid JWT)."""
         body = self.get_json_body()
         username = body.get("username")
         password = body.get("password")

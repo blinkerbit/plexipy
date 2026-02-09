@@ -6,7 +6,7 @@ Supports full app lifecycle: stop, clear-venv, create-venv, start, rebuild-venv.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +39,7 @@ def _get_venv_info(app_path) -> dict[str, Any]:
         try:
             total_size = sum(f.stat().st_size for f in venv_path.rglob("*") if f.is_file())
             info["size_mb"] = round(total_size / (1024 * 1024), 1)
-        except Exception:
+        except OSError:
             info["size_mb"] = None
     return info
 
@@ -56,6 +56,7 @@ class AdminBaseHandler(BaseHandler):
 class AdminDashboardHandler(AdminBaseHandler):
     """Serves the admin dashboard HTML page."""
 
+    @authenticated
     async def get(self):
         """Serve the admin dashboard."""
         admin_html = Path(__file__).parent / "static" / "index.html"
@@ -82,12 +83,13 @@ class AdminDashboardHandler(AdminBaseHandler):
 class AdminAPIStatusHandler(AdminBaseHandler):
     """Get complete system status."""
 
+    @authenticated
     async def get(self):
-        """Return full system status."""
+        """Return full system status (requires authentication)."""
         config = get_config()
 
         status = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "framework": {
                 "name": "PyRest",
                 "version": "1.0.0",
@@ -168,8 +170,9 @@ class AdminAPIStatusHandler(AdminBaseHandler):
 class AdminAPIConfigHandler(AdminBaseHandler):
     """Get and update framework configuration."""
 
+    @authenticated
     async def get(self):
-        """Return current configuration."""
+        """Return current configuration (requires authentication)."""
         config = get_config()
 
         # Return safe config (exclude secrets)
@@ -207,7 +210,7 @@ class AdminAPIConfigHandler(AdminBaseHandler):
             try:
                 config.save()
                 self.success(data=updated, message="Configuration updated")
-            except Exception as e:
+            except (OSError, ValueError, TypeError) as e:
                 self.error(f"Failed to save configuration: {e!s}", 500)
         else:
             self.error("No valid fields to update", 400)
@@ -216,8 +219,9 @@ class AdminAPIConfigHandler(AdminBaseHandler):
 class AdminAPIAuthConfigHandler(AdminBaseHandler):
     """Get and update auth configuration."""
 
+    @authenticated
     async def get(self):
-        """Return auth configuration (secrets masked)."""
+        """Return auth configuration (secrets masked, requires authentication)."""
         auth_config = get_auth_config()
 
         # Mask sensitive values
@@ -244,8 +248,9 @@ class AdminAPIAuthConfigHandler(AdminBaseHandler):
 class AdminAPIAppsHandler(AdminBaseHandler):
     """Get all apps information."""
 
+    @authenticated
     async def get(self):
-        """Return list of all apps with details."""
+        """Return list of all apps with details (requires authentication)."""
         apps: list[dict[str, Any]] = []
 
         if self.app_loader:
@@ -305,8 +310,9 @@ class AdminAPIAppsHandler(AdminBaseHandler):
 class AdminAPIAppDetailHandler(AdminBaseHandler):
     """Get details for a specific app."""
 
+    @authenticated
     async def get(self, app_name: str):
-        """Return details for a specific app."""
+        """Return details for a specific app (requires authentication)."""
         if not self.app_loader:
             self.error("App loader not available", 500)
             return
@@ -610,8 +616,9 @@ class AdminAPIAppControlHandler(AdminBaseHandler):
 class AdminAPILogsHandler(AdminBaseHandler):
     """Get recent logs."""
 
+    @authenticated
     async def get(self):
-        """Return recent log entries."""
+        """Return recent log entries (requires authentication)."""
         # For now, return a placeholder
         # In production, you'd read from a log file or logging service
         self.success(data={"logs": [], "message": "Log viewing not yet implemented"})

@@ -4,7 +4,7 @@ Tests for the authentication module.
 
 import json
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -119,8 +119,8 @@ class TestJWTAuth:
         # Create an expired token manually
         expired_payload = {
             "sub": "testuser",
-            "exp": datetime.utcnow() - timedelta(hours=1),
-            "iat": datetime.utcnow() - timedelta(hours=2),
+            "exp": datetime.now(UTC) - timedelta(hours=1),
+            "iat": datetime.now(UTC) - timedelta(hours=2),
         }
         expired_token = jwt.encode(expired_payload, TEST_JWT_SECRET, algorithm="HS256")
 

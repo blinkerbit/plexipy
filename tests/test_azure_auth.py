@@ -3,7 +3,7 @@ Tests for Azure AD authentication decorators.
 """
 
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -58,8 +58,8 @@ class TestAzureADAuthTokenMethods:
             "groups": ["group-1", "group-2"],
             "tid": "tenant-id",
             "azp": "app-id",
-            "iat": datetime.utcnow(),
-            "exp": datetime.utcnow() + timedelta(hours=1),
+            "iat": datetime.now(UTC),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
         }
         return jwt.encode(payload, TEST_JWT_SECRET, algorithm="HS256")
 
@@ -90,7 +90,7 @@ class TestAzureADAuthTokenMethods:
     def test_extract_roles_empty(self, azure_auth):
         """Should return empty list when no roles."""
         token_without_roles = jwt.encode(
-            {"sub": "user", "exp": datetime.utcnow() + timedelta(hours=1)},
+            {"sub": "user", "exp": datetime.now(UTC) + timedelta(hours=1)},
             TEST_JWT_SECRET,
             algorithm="HS256",
         )
@@ -140,7 +140,7 @@ class TestAzureADAuthenticatedDecorator:
             "name": "Test User",
             "preferred_username": "test@example.com",
             "roles": ["Admin", "Reader"],
-            "exp": datetime.utcnow() + timedelta(hours=1),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
         }
         return jwt.encode(payload, TEST_JWT_SECRET, algorithm="HS256")
 
@@ -288,7 +288,7 @@ class TestAzureADProtectedDecorator:
             "name": "Test User",
             "preferred_username": "test@example.com",
             "roles": ["Admin", "Reader"],
-            "exp": datetime.utcnow() + timedelta(hours=1),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
         }
         return jwt.encode(payload, TEST_JWT_SECRET, algorithm="HS256")
 

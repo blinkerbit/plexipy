@@ -413,7 +413,7 @@ class FrameworkConfig:
             "jwt_secret": os.environ.get("PYREST_JWT_SECRET", ""),
             "jwt_expiry_hours": 24,
             "cors_enabled": True,
-            "cors_origins": ["*"],
+            "cors_origins": [],  # S5122: no wildcard by default; configure explicitly
             "log_level": "INFO",
             "static_path": "static",
             "template_path": "templates",

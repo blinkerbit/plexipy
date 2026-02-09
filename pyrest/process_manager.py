@@ -68,8 +68,8 @@ def _get_child_pids(parent_pid: int) -> list[int]:
                             children.append(int(entry.name))
             except (PermissionError, FileNotFoundError, ValueError, IndexError):
                 continue
-    except Exception as e:
-        logger.debug(f"Error scanning child PIDs for {parent_pid}: {e}")
+    except OSError as e:
+        logger.debug("Error scanning child PIDs for %d: %s", parent_pid, e)
     return children
 
 
@@ -310,8 +310,8 @@ class ProcessManager:
             logger.info(f"App '{app_name}' started on port {port} (PID: {process.pid})")
             return app_process
 
-        except Exception as e:
-            logger.exception(f"Failed to spawn app {app_name}: {e}")
+        except (OSError, ValueError) as e:
+            logger.exception("Failed to spawn app %s: %s", app_name, e)
             return None
 
     # ------------------------------------------------------------------
@@ -374,8 +374,8 @@ class ProcessManager:
             logger.info(f"App {app_name} stopped (all processes terminated)")
             return True
 
-        except Exception as e:
-            logger.exception(f"Error stopping app {app_name}: {e}")
+        except OSError as e:
+            logger.exception("Error stopping app %s: %s", app_name, e)
             self._processes.pop(app_name, None)
             return False
 
@@ -405,7 +405,7 @@ class ProcessManager:
                     app_process.process.terminate()
                 try:
                     app_process.process.wait(timeout=3)
-                except Exception as e:
+                except (subprocess.TimeoutExpired, OSError) as e:
                     logger.debug("Timeout waiting for %s, force killing: %s", app_name, e)
                     app_process.process.kill()
         self._processes.clear()

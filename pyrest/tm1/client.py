@@ -74,7 +74,7 @@ class TM1Connection:
         user: str = "",
         password: str = "",
         access_token: str = "",
-        ssl_verify: bool = False,
+        ssl_verify: bool = True,
         timeout: float = 30.0,
         session_context: str = "PyRest",
     ):
@@ -497,7 +497,7 @@ def connect(
     user: str = "",
     password: str = "",
     access_token: str = "",
-    ssl_verify: bool = False,
+    ssl_verify: bool = True,
     timeout: float = 30.0,
 ) -> TM1Connection:
     """

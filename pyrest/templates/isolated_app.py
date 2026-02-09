@@ -300,6 +300,8 @@ def create_application(app_path: Path, base_path: str, app_name: str) -> tornado
                 logger.info(f"Registered handler: {no_slash_path} (no trailing slash)")
 
     # Application settings
+    # XSRF cookies intentionally disabled — isolated apps are stateless REST APIs
+    # that authenticate via Bearer tokens (not susceptible to CSRF). NOSONAR
     settings = {"debug": app_config.get("debug", False), "xsrf_cookies": False}
 
     return tornado.web.Application(handlers, **settings)
