@@ -214,7 +214,7 @@ class AppConfigParser:
                 str_value = str(value)
 
             # Resolve any environment variable references in the value
-            resolved_value = self._resolve_value(param, str_value)
+            resolved_value = self._resolve_value(str_value)
             if isinstance(resolved_value, str):
                 str_value = resolved_value
 

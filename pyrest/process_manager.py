@@ -383,7 +383,7 @@ class ProcessManager:
                 try:
                     if is_valid_pid(parent_pid):
                         pgid = os.getpgid(parent_pid)
-                        os.killpg(pgid, signal.SIGKILL)
+                        os.killpg(pgid, signal.SIGKILL) #NOSONAR already checking valid pid
                     else:
                         app_process.process.kill()
                 except OSError:
