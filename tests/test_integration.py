@@ -18,10 +18,10 @@ from pyrest.server import create_app
 from pyrest.server import create_app
 from tests.conftest import TEST_JWT_SECRET
 
-TEST_PASSWORD = "testpass"
-ADMIN_PASSWORD = "adminpass"
-FLOW_PASSWORD = "flowpass"
-WRONG_PASSWORD = "wrong"
+TEST_PASSWORD = "testpass"  # NOSONAR
+ADMIN_PASSWORD = "adminpass"  # NOSONAR
+FLOW_PASSWORD = "flowpass"  # NOSONAR
+WRONG_PASSWORD = "wrong"  # NOSONAR
 
 
 class TestServerIntegration(tornado.testing.AsyncHTTPTestCase):

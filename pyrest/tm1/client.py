@@ -417,7 +417,7 @@ class TM1Connection:
             # Intentionally insecure for development/testing
             ctx = ssl.create_default_context()  # NOSONAR : S5527, S4423 (Insecure for dev envs) #NOSONAR
             ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
+            ctx.verify_mode = ssl.CERT_NONE # NOSONAR : S5527, S4423 (Insecure for dev envs) #NOSONAR
             return ctx
         return None
 
